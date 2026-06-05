@@ -1,7 +1,8 @@
+from app.core.config import settings
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
 
-DATABASE_URL = "postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/fastapi"
+DATABASE_URL = settings.DATABASE_URL
 
 # Create the engine
 engine = create_async_engine(DATABASE_URL, echo=True)

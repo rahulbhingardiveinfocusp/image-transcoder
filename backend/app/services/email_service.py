@@ -7,7 +7,7 @@ class EmailService:
         # LocalStack/AWS SES Client
         ses = boto3.client(
             "ses",
-            endpoint_url="http://localhost:4566", # LocalStack endpoint
+            endpoint_url="http://localstack:4566", # LocalStack endpoint
             region_name=settings.AWS_REGION,
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY

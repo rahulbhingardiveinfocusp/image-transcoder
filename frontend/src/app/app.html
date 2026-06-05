@@ -1,0 +1,6 @@
+<div style="padding: 20px;">
+  <h2>Upload Image to S3</h2>
+
+  <input type="file" (change)="onFileSelected($event)" />
+  <button (click)="onUpload()" [disabled]="!selectedFile">Upload</button>
+</div>

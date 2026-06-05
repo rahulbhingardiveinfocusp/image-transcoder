@@ -1,3 +1,5 @@
+import asyncio
+
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import AsyncSessionLocal
@@ -59,7 +61,7 @@ class ImageService:
             # 3. Perform S3 Move (Note: boto3 is synchronous, which blocks the event loop, 
             # but it will function. For a true async app, look into aioboto3 later).
             s3 = boto3.client(
-                "s3", endpoint_url="http://localhost:4566",
+                "s3", endpoint_url="http://localstack:4566",
                 aws_access_key_id="test", aws_secret_access_key="test", region_name="us-east-1"
             )
             
@@ -83,3 +85,35 @@ class ImageService:
                 await db.rollback()  # <-- Added await
                 print(f"Error moving file: {e}")
                 return False
+    @staticmethod
+    def _get_s3_client():
+        # Centralized client creation to avoid repetition and ensure localstack connectivity
+        return boto3.client(
+            "s3", 
+            endpoint_url="http://localstack:4566",
+            aws_access_key_id="test", 
+            aws_secret_access_key="test", 
+            region_name="us-east-1"
+        )
+
+    @staticmethod
+    async def download_image(bucket: str, key: str) -> bytes:
+        # Running sync boto3 in an executor prevents blocking the event loop
+        loop = asyncio.get_event_loop()
+        s3 = ImageService._get_s3_client()
+        
+        def _download():
+            response = s3.get_object(Bucket=bucket, Key=key)
+            return response['Body'].read()
+            
+        return await loop.run_in_executor(None, _download)
+
+    @staticmethod
+    async def upload_thumbnail(bucket: str, key: str, data: bytes):
+        loop = asyncio.get_event_loop()
+        s3 = ImageService._get_s3_client()
+        
+        def _upload():
+            s3.put_object(Bucket=bucket, Key=key, Body=data)
+            
+        await loop.run_in_executor(None, _upload)

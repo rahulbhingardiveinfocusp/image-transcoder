@@ -8,7 +8,7 @@ class S3Service:
             region_name=settings.AWS_REGION,
             # Boto3 automatically picks up credentials from env vars 
             # if they are set in the environment.
-            endpoint_url="http://localhost:4566",
+            endpoint_url="http://localstack:4566",
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None
         )

@@ -38,10 +38,17 @@ awslocal ses verify-email-identity --email-address $EMAIL_IDENTITY
 cat <<EOF > /tmp/notification.json
 {
   "QueueConfigurations": [
-    {
-      "QueueArn": "$QUEUE_ARN",
-      "Events": ["s3:ObjectCreated:*"]
-    }
+   {
+                "QueueArn": "$QUEUE_ARN",
+                "Events": ["s3:ObjectCreated:*"],
+                "Filter": {
+                    "Key": {
+                        "FilterRules": [
+                            {"Name": "prefix", "Value": "raw/"}
+                        ]
+                    }
+                }
+            }
   ]
 }
 EOF
