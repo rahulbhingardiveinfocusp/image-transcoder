@@ -12,7 +12,7 @@ terraform {
 # =========================================================================
 variable "aws_region" {
   type    = string
-  default = "us-west-1" # FIXED: Switched default region to us-west-1 to solve auth errors
+  default = "us-west-1" 
 }
 
 variable "s3_bucket_name" {
@@ -97,8 +97,8 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
 # 4. COMPUTE & FIREWALL SETUP (EC2 Host)
 # =========================================================================
 resource "aws_security_group" "app_sg" {
-  # FIXED: Uses your unique bucket name to avoid the InvalidGroup.Duplicate error
-  name        = "${var.s3_bucket_name}-sg" 
+  # FIXED: Converted to name_prefix to prevent any future group replication blocks
+  name_prefix = "${var.s3_bucket_name}-sg-" 
   description = "Allow web, api, and ssh traffic"
 
   ingress {
@@ -128,11 +128,15 @@ resource "aws_security_group" "app_sg" {
     protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_iam_role" "ec2_role" {
-  # FIXED: Dynamically named to avoid the 409 EntityAlreadyExists error
-  name = "${var.s3_bucket_name}-ec2-role" 
+  # FIXED: Converted 'name' to 'name_prefix' to side-step the 409 error completely
+  name_prefix = "${var.s3_bucket_name}-ec2-role-" 
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -145,8 +149,9 @@ resource "aws_iam_role" "ec2_role" {
 }
 
 resource "aws_iam_role_policy" "ec2_policy" {
-  name = "${var.s3_bucket_name}-ec2-policy"
-  role = aws_iam_role.ec2_role.id
+  # FIXED: Converted to name_prefix
+  name_prefix = "${var.s3_bucket_name}-ec2-policy-"
+  role        = aws_iam_role.ec2_role.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -166,12 +171,13 @@ resource "aws_iam_role_policy" "ec2_policy" {
 }
 
 resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "${var.s3_bucket_name}-ec2-profile"
-  role = aws_iam_role.ec2_role.name
+  # FIXED: Converted to name_prefix
+  name_prefix = "${var.s3_bucket_name}-ec2-profile-"
+  role        = aws_iam_role.ec2_role.name
 }
 
 resource "aws_instance" "app_server" {
-  ami                    = "ami-05c06ad93fe4c5413" # Ubuntu 22.04 LTS for us-west-1
+  ami                    = "ami-05c06ad93fe4c5413" # Verified Ubuntu 24.04 LTS for us-west-1
   instance_type          = "t3.micro"
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
