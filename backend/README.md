@@ -64,3 +64,5 @@ Imports not found? Ensure your PYTHONPATH includes the backend/ root directory.
 No Events? Check if you have run the put-bucket-notification-configuration command to link S3 to SQS.
 
 Worker not responding? Ensure Celery is connected to your Redis/Broker URL.
+
+tree /A /F| Where-Object {$_ -notmatch 'node_modules|bin|obj|.angular|fastenv|localstack-data|cache|.vscode'} > tree.txt

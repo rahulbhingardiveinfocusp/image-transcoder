@@ -1,33 +1,40 @@
 import boto3
+import logging
 from app.core.config import settings
+
+logger = logging.getLogger(__name__)
 
 class S3Service:
     def __init__(self):
+
         self.s3 = boto3.client(
             "s3",
+            endpoint_url=settings.LOCALSTACK_ENDPOINT, # Changed to use your config
             region_name=settings.AWS_REGION,
-            # Boto3 automatically picks up credentials from env vars 
-            # if they are set in the environment.
-            endpoint_url="http://localstack:4566",
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
+            config=boto3.session.Config(signature_version='s3v4')
         )
-    
-    def generate_presigned_url(self, object_name: str, expiration=3600):
-        return self.s3.generate_presigned_url(
-            'put_object',
-            Params={'Bucket': settings.S3_BUCKET_NAME, 'Key': object_name},
-            ExpiresIn=expiration
-        )
-    def generate_download_url(self, object_name: str, expiration=3600):
+
+    def generate_presigned_url(self, object_name: str, client_method: str = 'put_object', expiration: int = 3600):
         """
-        Generates a presigned URL to share a file publicly for a limited time.
+        Generic method to generate presigned URLs to reduce code duplication.
         """
-        return self.s3.generate_presigned_url(
-            'get_object',
-            Params={
-                'Bucket': settings.S3_BUCKET_NAME, 
-                'Key': object_name
-            },
-            ExpiresIn=expiration
-        )
+        try:
+            return self.s3.generate_presigned_url(
+                client_method,
+                Params={
+                    'Bucket': settings.S3_BUCKET_NAME, 
+                    'Key': object_name
+                },
+                ExpiresIn=expiration
+            )
+        except Exception as e:
+            logger.error(f"Error generating presigned URL for {object_name}: {e}")
+            raise
+
+    def generate_upload_url(self, object_name: str, expiration: int = 3600):
+        return self.generate_presigned_url(object_name, 'put_object', expiration)
+
+    def generate_download_url(self, object_name: str, expiration: int = 3600):
+        return self.generate_presigned_url(object_name, 'get_object', expiration)

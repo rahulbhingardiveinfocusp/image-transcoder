@@ -7,7 +7,7 @@ from app.core.config import settings  # Import your central settings object
 # Use settings from your config file
 sqs = boto3.client(
     "sqs", 
-    endpoint_url="http://localstack:4566", # or settings.LOCALSTACK_ENDPOINT
+    endpoint_url=settings.LOCALSTACK_ENDPOINT, # or settings.LOCALSTACK_ENDPOINT
     region_name=settings.AWS_REGION,
     aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
     aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY

@@ -10,7 +10,9 @@ class Settings(BaseSettings):
     AWS_REGION: str = "us-east-1"
     SQS_QUEUE_URL: str
     S3_BUCKET_NAME: str
-   
+    LOCALSTACK_ENDPOINT: str
+    ADMIN_EMAIL:str
+    
     class Config:
         env_file = ".env"
 
