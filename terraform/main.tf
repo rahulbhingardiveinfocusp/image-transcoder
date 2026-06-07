@@ -171,7 +171,7 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 }
 
 resource "aws_instance" "app_server" {
-  ami                    = "ami-0da424eb8812759e6" # Ubuntu 22.04 LTS for us-west-1
+  ami                    = "ami-05c06ad93fe4c5413" # Ubuntu 22.04 LTS for us-west-1
   instance_type          = "t3.micro"
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
