@@ -38,11 +38,12 @@ jobs:
 
       - name: Execute
         working-directory: ./terraform
-        # Move the env block here, directly tied to the execution shell
         env: 
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID || 'mock_access_key' }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || 'mock_secret_key' }}
-          AWS_DEFAULT_REGION: "us-east-1"
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          # This maps your GitHub secret directly to your Terraform variable:
+          TF_VAR_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
         run: |
           terraform init
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
