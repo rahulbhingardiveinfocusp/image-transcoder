@@ -21,13 +21,8 @@ jobs:
       
       - name: Build & Push
         run: |
-          # 1. Build the image combining your username and repo secrets
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest ./backend
-          
-          # 2. Log in using your GitHub Secrets
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-          
-          # 3. Push the image up to Docker Hub
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
 
   infra:
@@ -39,13 +34,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Installs Terraform CLI on the GitHub runner
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: "1.7.0" # You can adjust this to match your local Terraform version
+          terraform_version: "1.7.0"
 
+      # Added working-directory to execute commands inside the terraform folder
       - name: Execute
+        working-directory: ./terraform
         run: |
           terraform init
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
