@@ -7,33 +7,36 @@ terraform {
   }
 }
 
-provider "aws" {
-  region                      = "us-east-1"
-  access_key                  = "mock_access_key"
-  secret_key                  = "mock_secret_key"
-  
-  # Crucial flags to prevent EC2 IMDS / real AWS check loops:
-  skip_credentials_validation = true
-  skip_metadata_api_check     = true
-  skip_requesting_account_id  = true
+# =========================================================================
+# VARIABLES (Passed dynamically from GitHub Environment Secrets)
+# =========================================================================
+variable "aws_region" {
+  type    = string
+  default = "us-east-1"
+}
 
-  # FIXED: Modern AWS Provider endpoint syntax including compute/security layers
-  endpoints {
-    s3           = "http://localhost:4566"
-    sqs          = "http://localhost:4566"
-    ses          = "http://localhost:4566"
-    ec2          = "http://localhost:4566"
-    iam          = "http://localhost:4566"
-    sts          = "http://localhost:4566"
-  }
+variable "s3_bucket_name" {
+  type        = string
+  description = "The globally unique bucket name matching your secret/env configuration"
+}
+
+variable "sqs_queue_name" {
+  type        = string
+  default     = "image-processing-queue"
+  description = "The queue name matching your secret/env configuration"
+}
+
+provider "aws" {
+  region = var.aws_region
+  # Credentials are implicitly picked up from AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY
 }
 
 # =========================================================================
 # 1. STORAGE (S3) & CORS SETUP
 # =========================================================================
 resource "aws_s3_bucket" "app_bucket" {
-  bucket        = "my-test-bucket" 
-  force_destroy = true 
+  bucket        = var.s3_bucket_name
+  force_destroy = false # Set to true only if you want destroy to wipe all user photos
 }
 
 resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
@@ -52,7 +55,8 @@ resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
 # 2. QUEUE (SQS) & PERMISSIONS SETUP
 # =========================================================================
 resource "aws_sqs_queue" "app_queue" {
-  name = "image-processing-queue"
+  name                      = var.sqs_queue_name
+  receive_wait_time_seconds = 20 
 }
 
 resource "aws_sqs_queue_policy" "s3_to_sqs_policy" {
@@ -166,7 +170,7 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 }
 
 resource "aws_instance" "app_server" {
-  ami                    = "ami-0c7217cdde317cfec" 
+  ami                    = "ami-0c7217cdde317cfec" # Ubuntu 22.04 LTS (Verify region support)
   instance_type          = "t2.micro"
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
@@ -185,6 +189,13 @@ resource "aws_instance" "app_server" {
   }
 }
 
+# =========================================================================
+# OUTPUTS
+# =========================================================================
 output "server_public_ip" {
   value = aws_instance.app_server.public_ip
+}
+
+output "sqs_production_url" {
+  value = aws_sqs_queue.app_queue.id
 }
