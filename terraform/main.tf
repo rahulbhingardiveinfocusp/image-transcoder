@@ -8,7 +8,24 @@ terraform {
 }
 
 provider "aws" {
-  region = "us-east-1"
+  region                      = "us-east-1"
+  access_key                  = "mock_access_key"
+  secret_key                  = "mock_secret_key"
+  
+  # Crucial flags to prevent EC2 IMDS / real AWS check loops:
+  skip_credentials_validation = true
+  skip_metadata_api_check     = true
+  skip_requesting_account_id  = true
+
+  # FIXED: Modern AWS Provider endpoint syntax including compute/security layers
+  endpoints {
+    s3           = "http://localhost:4566"
+    sqs          = "http://localhost:4566"
+    ses          = "http://localhost:4566"
+    ec2          = "http://localhost:4566"
+    iam          = "http://localhost:4566"
+    sts          = "http://localhost:4566"
+  }
 }
 
 # =========================================================================
@@ -19,14 +36,13 @@ resource "aws_s3_bucket" "app_bucket" {
   force_destroy = true 
 }
 
-# Translates your 'put-bucket-cors' command to AWS Production
 resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
   bucket = aws_s3_bucket.app_bucket.id
 
   cors_rule {
     allowed_headers = ["*"]
     allowed_methods = ["PUT", "POST", "GET"]
-    allowed_origins = ["*"] # Allows any browser across the internet to stream uploads
+    allowed_origins = ["*"] 
     expose_headers  = ["ETag"]
     max_age_seconds = 3000
   }
@@ -39,7 +55,6 @@ resource "aws_sqs_queue" "app_queue" {
   name = "image-processing-queue"
 }
 
-# CRITICAL FOR REAL AWS: Allows S3 bucket permission to push events into your SQS Queue
 resource "aws_sqs_queue_policy" "s3_to_sqs_policy" {
   queue_url = aws_sqs_queue.app_queue.id
 
@@ -62,17 +77,16 @@ resource "aws_sqs_queue_policy" "s3_to_sqs_policy" {
 }
 
 # =========================================================================
-# 3. AUTOMATION (S3 Event Event Notification Trigger)
+# 3. AUTOMATION (S3 Event Notification Trigger)
 # =========================================================================
-# Translates your '/tmp/notification.json' logic into AWS production
 resource "aws_s3_bucket_notification" "bucket_notification" {
   bucket     = aws_s3_bucket.app_bucket.id
-  depends_on = [aws_sqs_queue_policy.s3_to_sqs_policy] # SQS must be open to listening before connecting
+  depends_on = [aws_sqs_queue_policy.s3_to_sqs_policy] 
 
   queue {
     queue_arn     = aws_sqs_queue.app_queue.arn
     events        = ["s3:ObjectCreated:*"]
-    filter_prefix = "raw/" # Matches your script exactly
+    filter_prefix = "raw/" 
   }
 }
 
@@ -94,14 +108,14 @@ resource "aws_security_group" "app_sg" {
     from_port   = 80
     to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # Angular Web Access
+    cidr_blocks = ["0.0.0.0/0"] 
   }
 
   ingress {
     from_port   = 8000
     to_port     = 8000
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"] # FastAPI direct api communication
+    cidr_blocks = ["0.0.0.0/0"] 
   }
 
   egress {
@@ -112,7 +126,6 @@ resource "aws_security_group" "app_sg" {
   }
 }
 
-# IAM Role so EC2 doesn't need hardcoded AWS Keys
 resource "aws_iam_role" "ec2_role" {
   name = "fastapi_ec2_role"
 
@@ -136,12 +149,12 @@ resource "aws_iam_role_policy" "ec2_policy" {
       {
         Effect   = "Allow"
         Action   = ["s3:*"]
-        Resource = ["${aws_s3_bucket.app_bucket.arn}", "${aws_s3_bucket.app_bucket.arn}/*"]
+        Resource = [aws_s3_bucket.app_bucket.arn, "${aws_s3_bucket.app_bucket.arn}/*"]
       },
       {
         Effect   = "Allow"
         Action   = ["sqs:*"]
-        Resource = "${aws_sqs_queue.app_queue.arn}"
+        Resource = aws_sqs_queue.app_queue.arn
       }
     ]
   })
@@ -153,7 +166,7 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 }
 
 resource "aws_instance" "app_server" {
-  ami                    = "ami-0c7217cdde317cfec" # Ubuntu 22.04 LTS
+  ami                    = "ami-0c7217cdde317cfec" 
   instance_type          = "t2.micro"
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name

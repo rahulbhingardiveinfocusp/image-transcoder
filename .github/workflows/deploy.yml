@@ -28,9 +28,6 @@ jobs:
   infra:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    env: 
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -39,9 +36,13 @@ jobs:
         with:
           terraform_version: "1.7.0"
 
-      # Added working-directory to execute commands inside the terraform folder
       - name: Execute
         working-directory: ./terraform
+        # Move the env block here, directly tied to the execution shell
+        env: 
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID || 'mock_access_key' }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY || 'mock_secret_key' }}
+          AWS_DEFAULT_REGION: "us-east-1"
         run: |
           terraform init
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
