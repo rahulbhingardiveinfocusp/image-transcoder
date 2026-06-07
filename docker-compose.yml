@@ -1,26 +1,9 @@
-services:
-  localstack:
-    image: localstack/localstack:latest
-    container_name: it-localstack
-    ports:
-      - "4566:4566"
-    environment:
-      - SERVICES=s3,sqs,ses
-      - DEBUG=1
-      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-""}
-    volumes:
-      - ./init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh
-      - ./localstack-data:/var/lib/localstack
-      - /var/run/docker.sock:/var/run/docker.sock
-    healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4566/_localstack/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+version: '3.8'
 
+services:
   postgres:
     image: postgres:16-alpine
-    container_name: it-postgres
+    container_name: prod-postgres
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
@@ -34,41 +17,33 @@ services:
       retries: 5
 
   fastapi:
+    image: ${DOCKERHUB_USERNAME}/${DOCKER_REPO}:latest # Pulls from Docker Hub instead of building local code
+    container_name: prod-fastapi
     ports:
-      - "8000:8000"
-    build: ./backend # <-- Fixed dot notation path
-    container_name: it-fastapi
+      - "80:8000" # Open on port 80 for normal web traffic
     depends_on:
-      localstack:
-        condition: service_healthy
       postgres:
         condition: service_healthy
-    env_file:
-      - .env
     environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - SQS_QUEUE_URL=${SQS_QUEUE_URL}
-      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
-      - AWS_REGION=${AWS_REGION}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN}
-    volumes:
-      - ./backend:/app # <-- Fixed bind mount format to absolute container path
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
+      - SQS_QUEUE_URL=${SQS_QUEUE_URL}      # Real AWS SQS URL injected by GitHub
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}    # Real AWS S3 bucket name
+      - AWS_REGION=us-east-1
+      - ADMIN_EMAIL=madnands5@gmail.com
+      # NOTICE: LOCALSTACK_ENDPOINT is gone! Boto3 will now automatically talk to real AWS.
 
   celery:
-    build: ./backend # <-- Fixed dot notation path
-    container_name: it-celery
-    # Fixed module string with dots and included PYTHONPATH wrapper
+    image: ${DOCKERHUB_USERNAME}/${DOCKER_REPO}:latest # Uses the exact same Docker Hub image
+    container_name: prod-celery
     entrypoint: sh -c "PYTHONPATH=/app celery -A app.tasks.image_tasks worker --loglevel=info -P gevent"
     depends_on:
-      localstack:
-        condition: service_healthy
       postgres:
         condition: service_healthy
-    env_file: .env
-    volumes:
-      - ./backend:/app # <-- Fixed bind mount format to absolute container path
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
+      - SQS_QUEUE_URL=${SQS_QUEUE_URL}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      - AWS_REGION=us-east-1
 
 volumes:
   db_data:

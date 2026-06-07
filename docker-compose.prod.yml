@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: fastapi
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  web:
+    image: ${DOCKERHUB_USERNAME}/${DOCKER_REPO}:latest
+    container_name: fastapi_app
+    restart: always
+    ports:
+      - "80:8000"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
+      - SQS_QUEUE_URL=${SQS_QUEUE_URL}
+      - S3_BUCKET_NAME=my-test-bucket
+      - AWS_REGION=us-east-1
+      - ADMIN_EMAIL=madnands5@gmail.com
+    depends_on:
+      - postgres
+    networks:
+      - app-network
+
+volumes:
+  postgres_prod_data:
+
+networks:
+  app-network:
+    driver: bridge
