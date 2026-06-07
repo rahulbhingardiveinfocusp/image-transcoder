@@ -97,7 +97,8 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
 # 4. COMPUTE & FIREWALL SETUP (EC2 Host)
 # =========================================================================
 resource "aws_security_group" "app_sg" {
-  name        = "fastapi-security-group"
+  # FIXED: Uses your unique bucket name to avoid the InvalidGroup.Duplicate error
+  name        = "${var.s3_bucket_name}-sg" 
   description = "Allow web, api, and ssh traffic"
 
   ingress {
@@ -130,7 +131,8 @@ resource "aws_security_group" "app_sg" {
 }
 
 resource "aws_iam_role" "ec2_role" {
-  name = "fastapi_ec2_role"
+  # FIXED: Dynamically named to avoid the 409 EntityAlreadyExists error
+  name = "${var.s3_bucket_name}-ec2-role" 
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -143,7 +145,7 @@ resource "aws_iam_role" "ec2_role" {
 }
 
 resource "aws_iam_role_policy" "ec2_policy" {
-  name = "fastapi_ec2_policy"
+  name = "${var.s3_bucket_name}-ec2-policy"
   role = aws_iam_role.ec2_role.id
 
   policy = jsonencode({
@@ -164,17 +166,13 @@ resource "aws_iam_role_policy" "ec2_policy" {
 }
 
 resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "fastapi_ec2_profile"
+  name = "${var.s3_bucket_name}-ec2-profile"
   role = aws_iam_role.ec2_role.name
 }
 
 resource "aws_instance" "app_server" {
-  # FIXED: Updated AMI string to point to Ubuntu 22.04 LTS native to us-west-1
-  ami                    = "ami-0da424eb8812759e6" 
-  
-  # FIXED: Switched from t2.micro to t3.micro to satisfy Free Tier regulations in us-west-1
+  ami                    = "ami-0da424eb8812759e6" # Ubuntu 22.04 LTS for us-west-1
   instance_type          = "t3.micro"
-  
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
