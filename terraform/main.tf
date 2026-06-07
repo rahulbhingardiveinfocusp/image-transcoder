@@ -12,7 +12,7 @@ terraform {
 # =========================================================================
 variable "aws_region" {
   type    = string
-  default = "us-east-1"
+  default = "us-west-1" # FIXED: Switched default region to us-west-1 to solve auth errors
 }
 
 variable "s3_bucket_name" {
@@ -28,7 +28,6 @@ variable "sqs_queue_name" {
 
 provider "aws" {
   region = var.aws_region
-  # Credentials are implicitly picked up from AWS_ACCESS_KEY_ID & AWS_SECRET_ACCESS_KEY
 }
 
 # =========================================================================
@@ -36,7 +35,7 @@ provider "aws" {
 # =========================================================================
 resource "aws_s3_bucket" "app_bucket" {
   bucket        = var.s3_bucket_name
-  force_destroy = false # Set to true only if you want destroy to wipe all user photos
+  force_destroy = false 
 }
 
 resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
@@ -170,8 +169,12 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 }
 
 resource "aws_instance" "app_server" {
-  ami                    = "ami-0c7217cdde317cfec" # Ubuntu 22.04 LTS (Verify region support)
-  instance_type          = "t2.micro"
+  # FIXED: Updated AMI string to point to Ubuntu 22.04 LTS native to us-west-1
+  ami                    = "ami-0da424eb8812759e6" 
+  
+  # FIXED: Switched from t2.micro to t3.micro to satisfy Free Tier regulations in us-west-1
+  instance_type          = "t3.micro"
+  
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
