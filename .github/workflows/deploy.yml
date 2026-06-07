@@ -42,7 +42,8 @@ jobs:
         env: 
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} # This sets the deployment target
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}   # This overrides the Terraform variable default
           TF_VAR_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
         run: |
           terraform init
