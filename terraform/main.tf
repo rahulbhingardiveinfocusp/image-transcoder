@@ -98,7 +98,7 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
 # =========================================================================
 resource "aws_security_group" "app_sg" {
   # FIXED: Converted to name_prefix to prevent any future group replication blocks
-  name_prefix = "${var.s3_bucket_name}-sg-" 
+  name_prefix = "test-fast-api-aws" 
   description = "Allow web, api, and ssh traffic"
 
   ingress {
