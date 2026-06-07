@@ -217,3 +217,4 @@ __marimo__/
 *.backend/postgres-data
 # Streamlit
 .streamlit/secrets.toml
+localstack-data
