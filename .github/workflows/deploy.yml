@@ -18,6 +18,7 @@ jobs:
     environment: dev
     steps:
       - uses: actions/checkout@v4
+      
       - name: Build & Push
         run: |
           # 1. Build the image combining your username and repo secrets
@@ -37,6 +38,13 @@ jobs:
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@v4
+
+      # Installs Terraform CLI on the GitHub runner
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0" # You can adjust this to match your local Terraform version
+
       - name: Execute
         run: |
           terraform init
