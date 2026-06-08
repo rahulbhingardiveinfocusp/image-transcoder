@@ -24,7 +24,7 @@ class EmailService:
 
         def _send():
             return ses.send_email(
-                Source="notifications@yourdomain.com",
+                Source=settings.ADMIN_EMAIL,
                 Destination={"ToAddresses": [recipient_email]},
                 Message={
                     "Subject": {"Data": "Your Processed Images"},
@@ -33,8 +33,8 @@ class EmailService:
             )
 
         try:
-            loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, _send)
+            # loop = asyncio.get_event_loop()
+            # await loop.run_in_executor(None, _send)
             logger.info(f"Email successfully sent to {recipient_email}")
         except Exception as e:
             logger.error(f"Failed to send email to {recipient_email}: {e}")

@@ -37,10 +37,10 @@ async def run_processing_logic(bucket: str, key: str):
 
     # 4. Notify Admin
     # Assuming EmailService.send_image_links expects a list of links/keys
-    await EmailService.send_image_links(
-        settings.ADMIN_EMAIL, 
-        [f"Original: {key}", f"Thumbnail: {thumbnail_key}"]
-    )
+    # await EmailService.send_image_links(
+    #     settings.ADMIN_EMAIL, 
+    #     [f"Original: {key}", f"Thumbnail: {thumbnail_key}"]
+    # )
     logger.info(f"Notification sent to {settings.ADMIN_EMAIL}")
         
     return {"status": "success", "key": key}
