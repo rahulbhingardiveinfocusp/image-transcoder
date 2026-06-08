@@ -18,7 +18,7 @@ cat <<EOF > /tmp/s3-cors.json
         {
             "AllowedHeaders": ["*"],
             "AllowedMethods": ["PUT", "POST", "GET"],
-            "AllowedOrigins": ["http://localhost:4200"],
+            "AllowedOrigins": ["*"],
             "ExposeHeaders": ["ETag"]
         }
     ]
