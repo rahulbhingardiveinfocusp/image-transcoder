@@ -291,15 +291,15 @@ resource "aws_instance" "app_server" {
               sudo docker pull ${var.dockerhub_username}/${var.docker_repo}:latest
               
               sudo docker run -d \
-  --name fastapi-app \
-  -p 8000:8000 \
-  --restart unless-stopped \
-  -e DATABASE_URL="postgresql://postgres:password@localhost:5432/postgres" \
-  -e SQS_QUEUE_URL="${aws_sqs_queue.app_queue.id}" \
-  -e S3_BUCKET_NAME="${var_s3_bucket_name}" \
-  -e LOCALSTACK_ENDPOINT="" \
-  -e ADMIN_EMAIL="yourpersonalemail@gmail.com" \
-  ${var_dockerhub_username}/${var_docker_repo}:latest
+              --name fastapi-app \
+              -p 8000:8000 \
+              --restart unless-stopped \
+              -e DATABASE_URL="postgresql://postgres:password@localhost:5432/postgres" \
+              -e SQS_QUEUE_URL="${aws_sqs_queue.app_queue.id}" \
+              -e S3_BUCKET_NAME="${var.s3_bucket_name}" \
+              -e LOCALSTACK_ENDPOINT="" \
+              -e ADMIN_EMAIL="yourpersonalemail@gmail.com" \
+              ${var.dockerhub_username}/${var.docker_repo}:latest
               EOF
 
   tags = { 
