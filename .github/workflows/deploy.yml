@@ -12,6 +12,9 @@ on:
         options: [deploy, destroy]
 
 jobs:
+  # =========================================================================
+  # 1. APPLICATION CODE PIPELINE (Only builds and pushes; no SSH connections!)
+  # =========================================================================
   build:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -19,16 +22,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - name: Build & Push
+      - name: Build & Push to DockerHub
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest ./backend
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
 
+  # =========================================================================
+  # 2. INFRASTRUCTURE MANAGEMENT
+  # =========================================================================
   infra:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    environment: dev # <-- FIXED: This allows this job to read secrets stored in the 'dev' environment
+    environment: dev 
     steps:
       - uses: actions/checkout@v4
 
@@ -42,9 +48,12 @@ jobs:
         env: 
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} # This sets the deployment target
-          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}   # This overrides the Terraform variable default
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} 
+          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}   
           TF_VAR_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+          # NEW: Passing Docker info to Terraform variables so user data can read them
+          TF_VAR_dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
+          TF_VAR_docker_repo: ${{ secrets.DOCKER_REPO }}
         run: |
           terraform init
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
