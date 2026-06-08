@@ -294,7 +294,7 @@ resource "aws_instance" "app_server" {
               --name fastapi-app \
               -p 8000:8000 \
               --restart unless-stopped \
-              -e DATABASE_URL="postgresql+asyncpg://postgres:password@localhost:5432/postgres" \
+              -e DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:5432/fastapi" \
               -e SQS_QUEUE_URL="${aws_sqs_queue.app_queue.id}" \
               -e S3_BUCKET_NAME="${var.s3_bucket_name}" \
               -e LOCALSTACK_ENDPOINT="" \
