@@ -67,8 +67,8 @@ resource "aws_sqs_queue" "app_queue" {
   receive_wait_time_seconds = 20
 }
 
-resource "aws_s3_bucket_policy" "s3_to_sqs_policy" {
-  bucket = aws_s3_bucket.app_bucket.id
+resource "aws_sqs_queue_policy" "s3_to_sqs_policy" {
+  queue_url = aws_sqs_queue.app_queue.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -86,7 +86,8 @@ resource "aws_s3_bucket_policy" "s3_to_sqs_policy" {
 
 resource "aws_s3_bucket_notification" "bucket_notification" {
   bucket     = aws_s3_bucket.app_bucket.id
-  depends_on = [aws_s3_bucket_policy.s3_to_sqs_policy]
+
+  depends_on = [aws_sqs_queue_policy.s3_to_sqs_policy]
 
   queue {
     queue_arn     = aws_sqs_queue.app_queue.arn
