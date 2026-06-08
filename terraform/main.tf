@@ -7,22 +7,36 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "my-global-tf-state-bucket-092304627150-us-west-1-an" 
+    bucket = "my-global-tf-state-bucket" 
     key    = "fastapi/terraform.tfstate"
     region = "us-west-1"
   }
 }
 
 # =========================================================================
-# VARIABLES
+# VARIABLES 
 # =========================================================================
-variable "aws_region" { type = string; default = "us-west-1" }
-variable "s3_bucket_name" { type = string }
-variable "sqs_queue_name" { type = string; default = "image-processing-queue" }
+variable "aws_region" { 
+  type    = string
+  default = "us-west-1" 
+}
 
-# NEW: Variables so the EC2 instance knows which Docker image to pull
-variable "dockerhub_username" { type = string }
-variable "docker_repo" { type = string }
+variable "s3_bucket_name" { 
+  type    = string 
+}
+
+variable "sqs_queue_name" { 
+  type    = string
+  default = "image-processing-queue" 
+}
+
+variable "dockerhub_username" { 
+  type    = string 
+}
+
+variable "docker_repo" { 
+  type    = string 
+}
 
 provider "aws" {
   region = var.aws_region
