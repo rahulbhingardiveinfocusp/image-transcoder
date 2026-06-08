@@ -7,7 +7,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "my-global-tf-state-bucket" 
+    bucket = "my-global-tf-state-bucket-092304627150-us-west-1-an" 
     key    = "fastapi/terraform.tfstate"
     region = "us-west-1"
   }
