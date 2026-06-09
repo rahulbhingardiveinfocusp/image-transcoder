@@ -342,6 +342,8 @@ services:
       - S3_BUCKET_NAME=${var.s3_bucket_name}
       - AWS_REGION=${var.aws_region}
       - LOCALSTACK_ENDPOINT=""
+      - ADMIN_EMAIL=madnands5@gmail.com
+
     restart: unless-stopped
 
 volumes:
