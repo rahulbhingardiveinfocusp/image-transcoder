@@ -140,7 +140,7 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
 
   # 🟢 ORIGIN 2: Your EC2 Backend Server (Port 8000)
   origin {
-    domain_name = aws_instance.app_server.public_ip
+    domain_name = aws_instance.app_server.public_dns
     origin_id   = "EC2-Backend-API"
 
     custom_origin_config {
