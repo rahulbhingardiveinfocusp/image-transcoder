@@ -1,4 +1,5 @@
 export const environment = {
   production: true,
-  apiUrl: 'BACKEND_API_URL_PLACEHOLDER'
+  // After (Tells the browser to talk directly to CloudFront)
+  apiUrl: ''
 };
