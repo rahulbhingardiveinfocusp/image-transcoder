@@ -333,21 +333,22 @@ services:
       - AWS_REGION=${var.aws_region}
       - ADMIN_EMAIL=madnands5@gmail.com
       - LOCALSTACK_ENDPOINT=""
+      - CONTAINER_ROLE=web
     restart: unless-stopped
 
   celery:
     image: ${var.dockerhub_username}/${var.docker_repo}:latest
     container_name: prod-celery
-    entrypoint: sh -c "celery -A app.tasks.image_tasks worker --loglevel=info -P gevent"
     depends_on:
       - postgres
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
-      - SQS_QUEUE_URL=${replace(aws_sqs_queue.app_queue.id, "https://", "sqs://")}
+      - SQS_QUEUE_URL=${replace(aws_sqs_queue.app_queue.id, "https://", "sqs://")}?use_ssl=true
       - S3_BUCKET_NAME=${var.s3_bucket_name}
       - AWS_REGION=${var.aws_region}
       - LOCALSTACK_ENDPOINT=""
       - ADMIN_EMAIL=madnands5@gmail.com
+      - CONTAINER_ROLE=worker 
 
     restart: unless-stopped
 
