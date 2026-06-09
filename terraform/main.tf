@@ -347,6 +347,7 @@ resource "aws_instance" "app_server" {
                     - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.id}
                     - S3_BUCKET_NAME=${var.s3_bucket_name}
                     - AWS_REGION=${var.aws_region}
+                    - LOCALSTACK_ENDPOINT=""
                   restart: unless-stopped
 
               volumes:
