@@ -84,7 +84,14 @@ jobs:
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
+          
+      - name: Configure npm Network Resilience
+        run: |
+          npm config set fetch-retry-maxtimeout 120000
+          npm config set fetch-retry-mintimeout 20000
+          npm config set fetch-retries 5
+          npm config set maxsockets 10
 
       - name: Compile Frontend Production Bundle
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
