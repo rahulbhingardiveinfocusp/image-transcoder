@@ -136,22 +136,30 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Deploy Frontend Files & Set Anti-Caching Directives
+      -- name: Deploy Frontend Files & Set Anti-Caching Directives
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         run: |
-          # 1. Sync all assets and let AWS guess the content-type automatically
+          # 1. Upload all assets but explicitly tell AWS to skip content-type guessing for now
           aws s3 sync ./frontend/dist/*/browser s3://${{ secrets.S3_BUCKET_NAME }}-frontend --delete
 
-          # 2. Re-upload critical web files explicitly setting text/html content-type headers
+          # 2. Force-overwrite all JavaScript files to make absolutely sure they have the correct MIME type
+          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ \
+            --exclude "*" --include "*.js" \
+            --recursive --metadata-directive REPLACE \
+            --content-type "application/javascript"
+
+          # 3. Force-overwrite all CSS files to ensure styles render properly
+          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ \
+            --exclude "*" --include "*.css" \
+            --recursive --metadata-directive REPLACE \
+            --content-type "text/css"
+
+          # 4. Force-overwrite the index.html entry point with its anti-caching headers and proper HTML type
           aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html \
             --metadata-directive REPLACE \
             --content-type "text/html" \
             --cache-control "no-cache, no-store, must-revalidate"
-
-          # 3. Optional: explicitly force main configuration maps if you run into nested route downloads
-          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ \
-            --exclude "*" --include "*.js" --include "*.css" \
-            --recursive --metadata-directive REPLACE --cache-control "max-age=31536000"
+            
       - name: Invalidate CloudFront Cache
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         run: |
