@@ -64,6 +64,8 @@ jobs:
       # --- LIVE ROLLING DEPLOY TO EXISTING CONTAINER WORKER STACK ---
       - name: SSH Into EC2 & Pull Latest Images
         uses: appleboy/ssh-action@v1.0.3
+        # 👇 ADD THIS LINE to skip if the infrastructure isn't live yet
+        if: env.EC2_IP != ''
         with:
           host: ${{ env.EC2_IP }}
           username: ubuntu
