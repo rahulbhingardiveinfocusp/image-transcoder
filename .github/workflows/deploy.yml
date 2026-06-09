@@ -13,66 +13,37 @@ on:
 
 jobs:
   # =========================================================================
-  # 1. APPLICATION COMPILATION & CONTINUOUS DEPLOYMENT (Automatic on Push)
+  # 1. AUTOMATIC ON PUSH: Test, Build, and Push Images Only
   # =========================================================================
-  build:
+  build-and-test:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: dev
     steps:
       - uses: actions/checkout@v4
 
-      # --- BACKEND COMPILE ---
+      # --- STEP A: RUN BACKEND TESTS ---
+      - name: Set up Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: Install Test Dependencies & Run Tests
+        run: |
+          cd backend
+          pip install -r requirements.txt
+          # pytest # 👈 Uncomment this when your test suite is ready!
+
+      # --- STEP B: BUILD & PUSH TO DOCKER HUB ---
       - name: Build & Push Backend to DockerHub
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest ./backend
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
 
-      # --- FETCH RUNNING INFRASTRUCTURE IP ---
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.7.0"
-
-      - name: Get EC2 Public IP from State
-        id: tf_info_build
-        working-directory: ./terraform
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-        run: |
-          terraform init
-          
-          # Output everything as clean structured JSON to prevent text warning leaks
-          RAW_IP=$(terraform output -json | jq -r '.server_public_ip.value // ""')
-          
-          if [ ! -z "$RAW_IP" ] && [ "$RAW_IP" != "null" ]; then
-            echo "Infrastructure is active. Target host IP: $RAW_IP"
-            echo "EC2_IP=$RAW_IP" >> $GITHUB_ENV
-          else
-            echo "No live infrastructure found in S3 backend."
-            echo "EC2_IP=" >> $GITHUB_ENV
-          fi
-
-      # --- LIVE ROLLING DEPLOY TO EXISTING CONTAINER WORKER STACK ---
-      - name: SSH Into EC2 & Pull Latest Images
-        uses: appleboy/ssh-action@v1.0.3
-        if: env.EC2_IP != ''
-        with:
-          host: ${{ env.EC2_IP }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/app
-            sudo docker-compose pull fastapi celery
-            sudo docker-compose up -d --force-recreate fastapi celery
-
   # =========================================================================
-  # 2. INFRASTRUCTURE & FRONTEND DEPLOYMENT (Manual Trigger)
+  # 2. MANUAL WORKFLOW DISPATCH: Complete Infrastructure & App Deployment
   # =========================================================================
-  infra:
+  deploy-infrastructure:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     environment: dev 
@@ -84,7 +55,7 @@ jobs:
         with:
           terraform_version: "1.7.0"
 
-      # --- STEP A: PROVISION OR DESTROY INFRASTRUCTURE ---
+      # --- STEP A: PROVISION OR DESTROY AWS CORE ---
       - name: Execute Terraform
         id: terraform_step
         working-directory: ./terraform
@@ -96,78 +67,73 @@ jobs:
           TF_VAR_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
           TF_VAR_dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
           TF_VAR_docker_repo: ${{ secrets.DOCKER_REPO }}
-          TF_VAR_ssh_public_key: ${{ secrets.TF_VAR_ssh_public_key }}
         run: |
           terraform init
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
             terraform apply -auto-approve
-            echo "EC2_IP=$(terraform output -raw server_public_ip)" >> $GITHUB_ENV
+            REAL_IP=$(terraform output -raw server_public_ip)
+            echo "fetched_ip=$REAL_IP" >> $GITHUB_OUTPUT
           else
             terraform destroy -auto-approve
           fi
 
-      # --- STEP B: BUILD AND CONFIGURE ANGULAR STATIC ASSETS ---
-      - name: Setup Node.js Environment (For Frontend Sync)
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
+      # --- STEP B: CONFIGURE & BUILD ANGULAR WITH THE ACTIVE IP ---
+      - name: Setup Node.js Environment
+        if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
-      - name: Install & Configure Angular App with Dynamic IP
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
+      - name: Compile Frontend Production Bundle
+        if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         working-directory: ./frontend
         run: |
           npm ci
-          echo "Injecting Backend Endpoint URL (http://${{ env.EC2_IP }}:8000) into Angular production config..."
-          # 👇 FIXED: Swapped '/' for '#' as a delimiter and wrapped in strict single quotes
-          sed -i 's#BACKEND_API_URL_PLACEHOLDER#http://'${{ env.EC2_IP }}':8000#g' src/environments/environment.prod.ts
+          echo "Injecting Backend Endpoint URL (http://${{ steps.terraform_step.outputs.fetched_ip }}:8000) into Angular production config..."
+          sed -i 's#BACKEND_API_URL_PLACEHOLDER#http://'${{ steps.terraform_step.outputs.fetched_ip }}':8000#g' src/environments/environment.prod.ts
+          npm run build -- --configuration=production
 
-      - name: Build Production Angular Assets
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
-        working-directory: ./frontend
-        run: npm run build -- --configuration=production
-
-      # --- STEP C: SYNC OBJECTS TO S3 & EVAPORATE CACHES ---
+      # --- STEP C: PUSH STATIC FRONTEND ASSETS TO S3 ---
       - name: Configure AWS Credentials
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
+        if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Deploy Frontend Files & Set Anti-Caching Directives
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
+      - name: Deploy Frontend Files with Correct MIME Mappings
+        if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         run: |
-          # 1. Upload all assets but explicitly tell AWS to skip content-type guessing for now
           aws s3 sync ./frontend/dist/*/browser s3://${{ secrets.S3_BUCKET_NAME }}-frontend --delete
-
-          # 2. Force-overwrite all JavaScript files to make absolutely sure they have the correct MIME type
+          
           aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ \
-            --exclude "*" --include "*.js" \
-            --recursive --metadata-directive REPLACE \
-            --content-type "application/javascript"
-
-          # 3. Force-overwrite all CSS files to ensure styles render properly
+            --exclude "*" --include "*.js" --recursive --metadata-directive REPLACE --content-type "application/javascript"
+            
           aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ \
-            --exclude "*" --include "*.css" \
-            --recursive --metadata-directive REPLACE \
-            --content-type "text/css"
-
-          # 4. Force-overwrite the index.html entry point with its anti-caching headers and proper HTML type
+            --exclude "*" --include "*.css" --recursive --metadata-directive REPLACE --content-type "text/css"
+            
           aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html \
-            --metadata-directive REPLACE \
-            --content-type "text/html" \
-            --cache-control "no-cache, no-store, must-revalidate"
+            --metadata-directive REPLACE --content-type "text/html" --cache-control "no-cache, no-store, must-revalidate"
 
+      # --- STEP D: PURGE THE CLOUDFRONT CACHE ---
       - name: Invalidate CloudFront Cache
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
+        if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         run: |
           CLOUDFRONT_DIST_ID=$(cd ./terraform && terraform output -raw frontend_cdn_id || echo "")
-          
           if [ ! -z "$CLOUDFRONT_DIST_ID" ] && [ "$CLOUDFRONT_DIST_ID" != "Warning" ]; then
-            echo "Purging CloudFront Edge Cache for distribution: $CLOUDFRONT_DIST_ID"
             aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DIST_ID" --paths "/*"
-          else
-            echo "Skipping Cache Eviction: CloudFront Distribution output not found."
           fi
+
+      # --- STEP E: TELL EC2 WORKER TO RUN THE NEW IMAGE ---
+      - name: SSH & Refresh Live Docker Containers
+        uses: appleboy/ssh-action@v1.0.3
+        if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
+        with:
+          host: ${{ steps.terraform_step.outputs.fetched_ip }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/app
+            sudo docker-compose pull fastapi celery
+            sudo docker-compose up -d --force-recreate fastapi celery

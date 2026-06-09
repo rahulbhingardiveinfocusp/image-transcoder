@@ -38,7 +38,6 @@ variable "docker_repo" {
   type    = string 
 }
 
-# Add your public key as a variable to let Terraform manage the SSH access
 variable "ssh_public_key" {
   type        = string
   description = "The public SSH key used by GitHub Actions to log into the EC2 host"
@@ -202,9 +201,6 @@ resource "aws_s3_bucket_policy" "allow_cloudfront" {
 # =========================================================================
 # 3. COMPUTE & FIREWALL SETUP (EC2 Host)
 # =========================================================================
-
-
-
 resource "aws_security_group" "app_sg" {
   name_prefix = "fastapi-sg-"
   description = "Allow web, api, and ssh traffic"
@@ -288,75 +284,72 @@ resource "aws_instance" "app_server" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   key_name               = "fastapi-ec2-key"
 
-  user_data = <<-EOF
-              #!/bin/bash
-              # 1. Update system and install Docker
-              sudo apt-get update -y
-              sudo apt-get install docker.io -y
-              sudo systemctl start docker
-              sudo systemctl enable docker
+  # 👇 FIXED: Streamlined script generator formatting to prevent shell truncation bugs
+  user_data = <<EOF
+#!/bin/bash
+sudo apt-get update -y
+sudo apt-get install docker.io -y
+sudo systemctl start docker
+sudo systemctl enable docker
 
-              # 2. Install Docker Compose
-              sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-              sudo chmod +x /usr/local/bin/docker-compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+sudo chmod +x /usr/local/bin/docker-compose
 
-              # 3. Create workspace directory for continuous pipeline integration
-              mkdir -p /home/ubuntu/app
-              cd /home/ubuntu/app
+mkdir -p /home/ubuntu/app
+cd /home/ubuntu/app
 
-              # 4. Generate production stack infrastructure script
-              cat << 'DOCKER_COMPOSE' > docker-compose.yml
-              version: "3.8"
+cat << 'DOCKER_COMPOSE' > docker-compose.yml
+version: "3.8"
 
-              services:
-                postgres:
-                  image: postgres:16-alpine
-                  container_name: prod-postgres
-                  environment:
-                    - POSTGRES_USER=postgres
-                    - POSTGRES_PASSWORD=postgres
-                    - POSTGRES_DB=fastapi
-                  volumes:
-                    - db_prod_data:/var/lib/postgresql/data
-                  ports:
-                    - "5432:5432"
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: prod-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=fastapi
+    volumes:
+      - db_prod_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
 
-                fastapi:
-                  image: ${var.dockerhub_username}/${var.docker_repo}:latest
-                  container_name: prod-fastapi
-                  ports:
-                    - "8000:8000"
-                  depends_on:
-                    - postgres
-                  environment:
-                    - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
-                    - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.id}
-                    - S3_BUCKET_NAME=${var.s3_bucket_name}
-                    - AWS_REGION=${var.aws_region}
-                    - ADMIN_EMAIL=yourpersonalemail@gmail.com
-                  restart: unless-stopped
+  fastapi:
+    image: ${var.dockerhub_username}/${var.docker_repo}:latest
+    container_name: prod-fastapi
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
+      - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.id}
+      - S3_BUCKET_NAME=${var.s3_bucket_name}
+      - AWS_REGION=${var.aws_region}
+      - ADMIN_EMAIL=madnands5@gmail.com
+      - LOCALSTACK_ENDPOINT=""
+    restart: unless-stopped
 
-                celery:
-                  image: ${var.dockerhub_username}/${var.docker_repo}:latest
-                  container_name: prod-celery
-                  entrypoint: sh -c "celery -A app.tasks.image_tasks worker --loglevel=info -P gevent"
-                  depends_on:
-                    - postgres
-                  environment:
-                    - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
-                    - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.id}
-                    - S3_BUCKET_NAME=${var.s3_bucket_name}
-                    - AWS_REGION=${var.aws_region}
-                    - LOCALSTACK_ENDPOINT=""
-                  restart: unless-stopped
+  celery:
+    image: ${var.dockerhub_username}/${var.docker_repo}:latest
+    container_name: prod-celery
+    entrypoint: sh -c "celery -A app.tasks.image_tasks worker --loglevel=info -P gevent"
+    depends_on:
+      - postgres
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
+      - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.id}
+      - S3_BUCKET_NAME=${var.s3_bucket_name}
+      - AWS_REGION=${var.aws_region}
+      - LOCALSTACK_ENDPOINT=""
+    restart: unless-stopped
 
-              volumes:
-                db_prod_data:
-              DOCKER_COMPOSE
+volumes:
+  db_prod_data:
+DOCKER_COMPOSE
 
-              # 5. Boot entire application cluster initially
-              sudo docker-compose up -d
-              EOF
+sudo docker-compose up -d
+EOF
 
   tags = { 
     Name = "FastAPI-All-In-One-Server" 
@@ -378,7 +371,6 @@ output "frontend_url" {
   value = "https://${aws_cloudfront_distribution.frontend_cdn.domain_name}"
 }
 
-# 👇 CRITICAL FOR DEPLOY.YAML: Allows GitHub Actions to dynamically flush your cache edge locations
 output "frontend_cdn_id" {
   value       = aws_cloudfront_distribution.frontend_cdn.id
   description = "The ID of the CloudFront distribution to run CDN cache invalidations"
