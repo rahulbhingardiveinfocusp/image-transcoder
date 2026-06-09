@@ -131,17 +131,53 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
   is_ipv6_enabled     = true
   default_root_object = "index.html"
 
+  # 🟢 ORIGIN 1: Your S3 Frontend Bucket
   origin {
     domain_name              = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
     origin_id                = "S3-Frontend-Bucket"
     origin_access_control_id = aws_cloudfront_origin_access_control.oac.id
   }
 
+  # 🟢 ORIGIN 2: Your EC2 Backend Server (Port 8000)
+  origin {
+    domain_name = aws_instance.app_server.public_ip
+    origin_id   = "EC2-Backend-API"
+
+    custom_origin_config {
+      http_port                = 8000
+      https_port               = 443
+      origin_protocol_policy   = "http-only" # 👈 CloudFront talks to EC2 via HTTP, keeping it simple!
+      origin_ssl_protocols     = ["TLSv1.2"]
+    }
+  }
+
+  # 🟢 ROUTE 1: Intercept all API requests and forward them to EC2
+  ordered_cache_behavior {
+    path_pattern     = "/images/*" # 👈 Catches /images/request-upload, etc.
+    target_origin_id = "EC2-Backend-API"
+
+    allowed_methods  = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+    cached_methods   = ["GET", "HEAD"]
+    viewer_protocol_policy = "redirect-to-https" # 👈 Forces the browser to use HTTPS!
+
+    forwarded_values {
+      query_string = true
+      headers      = ["*"] # 👈 Crucial: Passes headers along to FastAPI
+      cookies {
+        forward = "all"
+      }
+    }
+    min_ttl     = 0
+    default_ttl = 0
+    max_ttl     = 0
+  }
+
+  # 🟢 DEFAULT ROUTE: Everything else goes to your S3 Angular Frontend
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
     target_origin_id       = "S3-Frontend-Bucket"
-    viewer_protocol_policy = "allow-all"
+    viewer_protocol_policy = "redirect-to-https"
 
     forwarded_values {
       query_string = false
