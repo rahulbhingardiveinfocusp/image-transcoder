@@ -136,7 +136,7 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      -- name: Deploy Frontend Files & Set Anti-Caching Directives
+      - name: Deploy Frontend Files & Set Anti-Caching Directives
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         run: |
           # 1. Upload all assets but explicitly tell AWS to skip content-type guessing for now
@@ -159,7 +159,7 @@ jobs:
             --metadata-directive REPLACE \
             --content-type "text/html" \
             --cache-control "no-cache, no-store, must-revalidate"
-            
+
       - name: Invalidate CloudFront Cache
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         run: |
