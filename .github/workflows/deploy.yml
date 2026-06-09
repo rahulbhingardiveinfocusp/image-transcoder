@@ -119,7 +119,8 @@ jobs:
         run: |
           npm ci
           echo "Injecting Backend Endpoint URL (http://${{ env.EC2_IP }}:8000) into Angular production config..."
-          sed -i 's/BACKEND_API_URL_PLACEHOLDER/http:\/\/'"${{ env.EC2_IP }}":8000/g' src/environments/environment.prod.ts
+          # 👇 FIXED: Swapped '/' for '#' as a delimiter and wrapped in strict single quotes
+          sed -i 's#BACKEND_API_URL_PLACEHOLDER#http://'${{ env.EC2_IP }}':8000#g' src/environments/environment.prod.ts
 
       - name: Build Production Angular Assets
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
