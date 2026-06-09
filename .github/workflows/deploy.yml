@@ -36,7 +36,7 @@ jobs:
           terraform_version: "1.7.0"
 
       - name: Get EC2 Public IP from State
-        id: tf_info
+        id: tf_info_build
         working-directory: ./terraform
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
@@ -45,38 +45,9 @@ jobs:
         run: |
           terraform init
           
-          # 1. Capture the raw output to a temp file, suppressing errors
-          terraform output -raw server_public_ip > temp_ip.txt 2>/dev/null || true
-          
-          # 2. Scrub the file: ignore lines containing "Warning" or "No outputs"
-          CLEAN_IP=$(grep -v -E "Warning|No outputs" temp_ip.txt | tr -d '[:space:]')
-          
-          # 3. Safely check if we got a real string back
-          if [ ! -z "$CLEAN_IP" ]; then
-            echo "Valid EC2 IP discovered: $CLEAN_IP"
-            echo "EC2_IP=$CLEAN_IP" >> $GITHUB_ENV
-          else
-            echo "No active infrastructure detected in state file yet."
-            echo "EC2_IP=" >> $GITHUB_ENV
-          fi
-          
-          rm -f temp_ip.txt
-      # --- LIVE ROLLING DEPLOY TO EXISTING CONTAINER WORKER STACK ---
-      - name: Get EC2 Public IP from State
-        id: tf_info
-        working-directory: ./terraform
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
-        run: |
-          terraform init
-          
-          # 1. Output everything as clean structured JSON and grab the value safely
-          # If the value doesn't exist, jq defaults it cleanly to an empty string ""
+          # Output everything as clean structured JSON to prevent text warning leaks
           RAW_IP=$(terraform output -json | jq -r '.server_public_ip.value // ""')
           
-          # 2. Strict validation: Ensure it is a valid string and not "null"
           if [ ! -z "$RAW_IP" ] && [ "$RAW_IP" != "null" ]; then
             echo "Infrastructure is active. Target host IP: $RAW_IP"
             echo "EC2_IP=$RAW_IP" >> $GITHUB_ENV
@@ -84,6 +55,20 @@ jobs:
             echo "No live infrastructure found in S3 backend."
             echo "EC2_IP=" >> $GITHUB_ENV
           fi
+
+      # --- LIVE ROLLING DEPLOY TO EXISTING CONTAINER WORKER STACK ---
+      - name: SSH Into EC2 & Pull Latest Images
+        uses: appleboy/ssh-action@v1.0.3
+        if: env.EC2_IP != ''
+        with:
+          host: ${{ env.EC2_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/app
+            sudo docker-compose pull fastapi celery
+            sudo docker-compose up -d --force-recreate fastapi celery
+
   # =========================================================================
   # 2. INFRASTRUCTURE & FRONTEND DEPLOYMENT (Manual Trigger)
   # =========================================================================
@@ -111,6 +96,7 @@ jobs:
           TF_VAR_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
           TF_VAR_dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
           TF_VAR_docker_repo: ${{ secrets.DOCKER_REPO }}
+          TF_VAR_ssh_public_key: ${{ secrets.TF_VAR_ssh_public_key }}
         run: |
           terraform init
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
@@ -152,16 +138,12 @@ jobs:
       - name: Deploy Frontend Files & Set Anti-Caching Directives
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         run: |
-          # Sync all standard hashed bundle elements
           aws s3 sync ./frontend/dist/*/browser s3://${{ secrets.S3_BUCKET_NAME }}-frontend --delete
-          
-          # Overwrite index.html explicitly setting headers to force fresh browser synchronization checks
           aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html --metadata-directive REPLACE --cache-control "no-cache, no-store, must-revalidate"
 
       - name: Invalidate CloudFront Cache
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         run: |
-          # Pull down the CDN distribution ID natively from the current Terraform state output
           CLOUDFRONT_DIST_ID=$(cd ./terraform && terraform output -raw frontend_cdn_id || echo "")
           
           if [ ! -z "$CLOUDFRONT_DIST_ID" ] && [ "$CLOUDFRONT_DIST_ID" != "Warning" ]; then
