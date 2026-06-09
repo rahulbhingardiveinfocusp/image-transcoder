@@ -203,11 +203,7 @@ resource "aws_s3_bucket_policy" "allow_cloudfront" {
 # 3. COMPUTE & FIREWALL SETUP (EC2 Host)
 # =========================================================================
 
-# Explicitly register the deployer key pair inside AWS 
-resource "aws_key_pair" "deployer" {
-  key_name   = "fastapi-ec2-key"
-  public_key = var.ssh_public_key
-}
+
 
 resource "aws_security_group" "app_sg" {
   name_prefix = "fastapi-sg-"
@@ -290,7 +286,7 @@ resource "aws_instance" "app_server" {
   instance_type          = "t3.micro"
   vpc_security_group_ids = [aws_security_group.app_sg.id]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
-  key_name               = aws_key_pair.deployer.key_name
+  key_name               = "fastapi-ec2-key"
 
   user_data = <<-EOF
               #!/bin/bash
