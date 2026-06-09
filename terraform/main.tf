@@ -267,7 +267,7 @@ resource "aws_iam_role_policy" "ec2_policy" {
         Effect   = "Allow" 
         Action   = ["sqs:*"] 
         Resource = aws_sqs_queue.app_queue.arn 
-      }.
+      },
       {
         Effect   = "Allow"
         Action   = ["sqs:ListQueues"]
