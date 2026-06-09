@@ -44,8 +44,7 @@ jobs:
           AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
         run: |
           terraform init
-          # Fetches the active host IP address securely out of your remote state file
-          echo "EC2_IP=$(terraform output -raw server_public_ip)" >> $GITHUB_ENV
+          echo "EC2_IP=$(terraform output -raw -no-color server_public_ip 2>/dev/null || echo '')" >> $GITHUB_ENV
 
       # --- LIVE ROLLING DEPLOY TO EXISTING CONTAINER WORKER STACK ---
       - name: SSH Into EC2 & Pull Latest Images
