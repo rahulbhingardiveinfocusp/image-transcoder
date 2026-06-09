@@ -13,7 +13,7 @@ on:
 
 jobs:
   # =========================================================================
-  # 1. APPLICATION COMPILATION (Runs automatically on git push to main)
+  # 1. APPLICATION COMPILATION & CONTINUOUS DEPLOYMENT (Automatic on Push)
   # =========================================================================
   build:
     if: github.event_name == 'push'
@@ -29,24 +29,38 @@ jobs:
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
 
-      # --- FRONTEND COMPILE ---
-      - name: Setup Node.js Environment
-        uses: actions/setup-node@v4
+      # --- FETCH RUNNING INFRASTRUCTURE IP ---
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
-          node-version: '20'
+          terraform_version: "1.7.0"
 
-      - name: Install Angular Dependencies
-        working-directory: ./frontend
-        run: npm ci
+      - name: Get EC2 Public IP from State
+        id: tf_info
+        working-directory: ./terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          terraform init
+          # Fetches the active host IP address securely out of your remote state file
+          echo "EC2_IP=$(terraform output -raw server_public_ip)" >> $GITHUB_ENV
 
-      # We build the frontend on push just to verify there are no syntax bugs,
-      # but we do not deploy it here because the infrastructure might not exist yet.
-      - name: Test Angular Build Configuration
-        working-directory: ./frontend
-        run: npm run build -- --configuration=production
+      # --- LIVE ROLLING DEPLOY TO EXISTING CONTAINER WORKER STACK ---
+      - name: SSH Into EC2 & Pull Latest Images
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ env.EC2_IP }}
+          username: ubuntu
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            cd /home/ubuntu/app
+            sudo docker-compose pull fastapi celery
+            sudo docker-compose up -d --force-recreate fastapi celery
 
   # =========================================================================
-  # 2. INFRASTRUCTURE & FRONTEND DEPLOYMENT (Manual Switch)
+  # 2. INFRASTRUCTURE & FRONTEND DEPLOYMENT (Manual Trigger)
   # =========================================================================
   infra:
     if: github.event_name == 'workflow_dispatch'
@@ -60,7 +74,7 @@ jobs:
         with:
           terraform_version: "1.7.0"
 
-      # --- STEP A: PROVISION INFRASTRUCTURE ---
+      # --- STEP A: PROVISION OR DESTROY INFRASTRUCTURE ---
       - name: Execute Terraform
         id: terraform_step
         working-directory: ./terraform
@@ -76,45 +90,58 @@ jobs:
           terraform init
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
             terraform apply -auto-approve
-            # Export the IP address out of terraform to use in later steps
             echo "EC2_IP=$(terraform output -raw server_public_ip)" >> $GITHUB_ENV
           else
             terraform destroy -auto-approve
           fi
 
-      # --- STEP B: DEPLOY FRONTEND (Only fires if we are deploying, not destroying) ---
+      # --- STEP B: BUILD AND CONFIGURE ANGULAR STATIC ASSETS ---
       - name: Setup Node.js Environment (For Frontend Sync)
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install & Configure Angular App with Dynamic IP
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         working-directory: ./frontend
         run: |
           npm ci
-          
-          # 👇 DYNAMIC INJECTION: Swaps out the placeholder for the real AWS EC2 IP address
-          echo "Injecting Backend IP: ${{ env.EC2_IP }} into Angular configuration..."
-          sed -i 's/BACKEND_API_URL_PLACEHOLDER/'"${{ env.EC2_IP }}"'/g' src/environments/environment.prod.ts
+          echo "Injecting Backend Endpoint URL (http://${{ env.EC2_IP }}:8000) into Angular production config..."
+          sed -i 's/BACKEND_API_URL_PLACEHOLDER/http:\/\/'"${{ env.EC2_IP }}":8000/g' src/environments/environment.prod.ts
 
-      # Now when this compiles, the correct server IP address is completely baked into your app code
       - name: Build Production Angular Assets
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         working-directory: ./frontend
         run: npm run build -- --configuration=production
 
+      # --- STEP C: SYNC OBJECTS TO S3 & EVAPORATE CACHES ---
       - name: Configure AWS Credentials
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      # 👇 FIXED: Cleaned up trailing text syntax error
-      - name: Deploy Frontend Files to Newly Created Suffix Bucket
-        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy'
+      - name: Deploy Frontend Files & Set Anti-Caching Directives
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         run: |
+          # Sync all standard hashed bundle elements
           aws s3 sync ./frontend/dist/*/browser s3://${{ secrets.S3_BUCKET_NAME }}-frontend --delete
+          
+          # Overwrite index.html explicitly setting headers to force fresh browser synchronization checks
+          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html --metadata-directive REPLACE --cache-control "no-cache, no-store, must-revalidate"
+
+      - name: Invalidate CloudFront Cache
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
+        run: |
+          # Pull down the CDN distribution ID natively from the current Terraform state output
+          CLOUDFRONT_DIST_ID=$(cd ./terraform && terraform output -raw frontend_cdn_id || echo "")
+          
+          if [ ! -z "$CLOUDFRONT_DIST_ID" ] && [ "$CLOUDFRONT_DIST_ID" != "Warning" ]; then
+            echo "Purging CloudFront Edge Cache for distribution: $CLOUDFRONT_DIST_ID"
+            aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DIST_ID" --paths "/*"
+          else
+            echo "Skipping Cache Eviction: CloudFront Distribution output not found."
+          fi
