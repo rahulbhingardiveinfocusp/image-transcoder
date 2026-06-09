@@ -139,9 +139,19 @@ jobs:
       - name: Deploy Frontend Files & Set Anti-Caching Directives
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         run: |
+          # 1. Sync all assets and let AWS guess the content-type automatically
           aws s3 sync ./frontend/dist/*/browser s3://${{ secrets.S3_BUCKET_NAME }}-frontend --delete
-          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html --metadata-directive REPLACE --cache-control "no-cache, no-store, must-revalidate"
 
+          # 2. Re-upload critical web files explicitly setting text/html content-type headers
+          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html \
+            --metadata-directive REPLACE \
+            --content-type "text/html" \
+            --cache-control "no-cache, no-store, must-revalidate"
+
+          # 3. Optional: explicitly force main configuration maps if you run into nested route downloads
+          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ \
+            --exclude "*" --include "*.js" --include "*.css" \
+            --recursive --metadata-directive REPLACE --cache-control "max-age=31536000"
       - name: Invalidate CloudFront Cache
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'deploy' && env.EC2_IP != ''
         run: |
