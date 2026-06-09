@@ -131,38 +131,38 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
   is_ipv6_enabled     = true
   default_root_object = "index.html"
 
-  # 🟢 ORIGIN 1: Your S3 Frontend Bucket (Fixed Typo Here)
+  # 🟢 ORIGIN 1: Your Existing S3 Frontend Bucket
   origin {
     domain_name              = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
     origin_id                = "S3-Frontend-Bucket"
     origin_access_control_id = aws_cloudfront_origin_access_control.oac.id
   }
 
-  # 🟢 ORIGIN 2: Your EC2 Backend Server (Fixed: Using public_dns instead of public_ip)
+  # 🟢 ORIGIN 2: Your EC2 Backend Server (Port 8000)
   origin {
-    domain_name = aws_instance.app_server.public_dns
+    domain_name = aws_instance.app_server.public_ip
     origin_id   = "EC2-Backend-API"
 
     custom_origin_config {
       http_port                = 8000
       https_port               = 443
-      origin_protocol_policy   = "http-only"
+      origin_protocol_policy   = "http-only" # CloudFront talks to EC2 via HTTP, but browser talks to CloudFront via HTTPS
       origin_ssl_protocols     = ["TLSv1.2"]
     }
   }
 
-  # 🟢 ROUTE 1: Intercept all API requests and forward them to EC2
+  # 🟢 ROUTE SYSTEM: Send all API requests directly to the EC2 Backend
   ordered_cache_behavior {
-    path_pattern     = "/images/*"
+    path_pattern     = "/images/*" # 👈 Catches your upload and image endpoints
     target_origin_id = "EC2-Backend-API"
 
     allowed_methods  = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
     cached_methods   = ["GET", "HEAD"]
-    viewer_protocol_policy = "redirect-to-https"
+    viewer_protocol_policy = "redirect-to-https" # Forces HTTPS for the API call!
 
     forwarded_values {
       query_string = true
-      headers      = ["*"]
+      headers      = ["*"] # Essential for passing headers to FastAPI
       cookies {
         forward = "all"
       }
@@ -172,7 +172,7 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
     max_ttl     = 0
   }
 
-  # 🟢 DEFAULT ROUTE: Everything else goes to your S3 Angular Frontend
+  # 🟢 DEFAULT ROUTE: Send everything else to the S3 Frontend
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
@@ -325,6 +325,7 @@ resource "aws_instance" "app_server" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   key_name               = "fastapi-ec2-key"
 
+  # 👇 FIXED: Streamlined script generator formatting to prevent shell truncation bugs
   user_data = <<EOF
 #!/bin/bash
 sudo apt-get update -y
@@ -332,7 +333,7 @@ sudo apt-get install docker.io -y
 sudo systemctl start docker
 sudo systemctl enable docker
 
-sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-\$(uname -s)-\$(uname -m)" -o /usr/local/bin/docker-compose
+sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
 
 mkdir -p /home/ubuntu/app
@@ -378,12 +379,13 @@ services:
       - postgres
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
-      - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.id}
+      - SQS_QUEUE_URL=${replace(aws_sqs_queue.app_queue.id, "https://", "sqs://")}?use_ssl=true
       - S3_BUCKET_NAME=${var.s3_bucket_name}
       - AWS_REGION=${var.aws_region}
       - LOCALSTACK_ENDPOINT=""
       - ADMIN_EMAIL=madnands5@gmail.com
       - CONTAINER_ROLE=worker 
+
     restart: unless-stopped
 
 volumes:
