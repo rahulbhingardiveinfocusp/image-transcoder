@@ -66,7 +66,6 @@ resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
       "PUT",
       "POST",
       "HEAD",
-      "OPTIONS"
     ]
 
     allowed_headers = [
