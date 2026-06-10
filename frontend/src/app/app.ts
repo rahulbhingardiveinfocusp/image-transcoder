@@ -12,7 +12,7 @@ import { environment } from '../environments/environment';
 export class App {
   selectedFile: File | null = null;
   // Use a fallback to prevent runtime crashes if the variable is missing
-  private apiBaseUrl = environment.apiUrl || 'http://localhost:8000';
+  private apiBaseUrl = environment.apiUrl;
 
   constructor(private http: HttpClient) { }
 
