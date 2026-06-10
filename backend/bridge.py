@@ -3,8 +3,8 @@ import json
 import time
 from app.tasks.image_tasks import process_s3_upload_task
 from app.core.config import settings  # Import your central settings object
-endpoint_url = settings.LOCALSTACK_ENDPOINT or None
-# Use settings from your config file
+endpoint_url = (settings.LOCALSTACK_ENDPOINT or "").strip() or None
+
 sqs = boto3.client(
     "sqs",
     region_name=settings.AWS_REGION,
