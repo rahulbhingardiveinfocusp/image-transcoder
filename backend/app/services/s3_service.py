@@ -31,7 +31,7 @@ class S3Service:
                 Params={
                     "Bucket": settings.S3_BUCKET_NAME,
                     "Key": object_name,
-                    "ContentType": content_type
+                   
                 },
                 ExpiresIn=expiration
             )

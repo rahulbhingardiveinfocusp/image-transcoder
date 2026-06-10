@@ -41,14 +41,13 @@ export class App {
         });
 
         // 2. Upload directly to S3
-        this.http.put(uploadUrl, file, { headers }).subscribe({
+        this.http.put(uploadUrl, file).subscribe({
           next: () => {
             alert('Upload successful!');
             this.selectedFile = null;
           },
           error: (err) => {
             console.error('S3 Upload failed:', err);
-            alert('Failed to upload file to S3.');
           }
         });
       },
