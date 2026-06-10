@@ -14,7 +14,19 @@ echo "Starting bridge..."
 python bridge.py &
 BRIDGE_PID=$!
 
-trap "kill $BRIDGE_PID" EXIT
+cleanup() {
+    echo "Stopping bridge..."
+    kill -TERM "$BRIDGE_PID" 2>/dev/null || true
+    wait "$BRIDGE_PID" 2>/dev/null || true
+}
+
+trap cleanup INT TERM EXIT
+
+sleep 2
+if ! kill -0 $BRIDGE_PID 2>/dev/null; then
+    echo "bridge.py failed to start"
+    exit 1
+fi
 
 if [ "$CONTAINER_ROLE" = "worker" ]; then
     echo "Starting Celery worker..."
