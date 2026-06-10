@@ -24,4 +24,4 @@ app.add_middleware(
 def root():
     return {"message": "Image Transcoding Service is operational"}
 
-app.include_router(v1_router, prefix="/images/request-upload", tags=["images"])
+app.include_router(v1_router, prefix="/images", tags=["images"])
