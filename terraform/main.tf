@@ -378,7 +378,7 @@ services:
       - postgres
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
-      - SQS_QUEUE_URL=aws_sqs_queue.app_queue.id
+      - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.url}
       - S3_BUCKET_NAME=${var.s3_bucket_name}
       - AWS_REGION=${var.aws_region}
       - ADMIN_EMAIL=madnands5@gmail.com
