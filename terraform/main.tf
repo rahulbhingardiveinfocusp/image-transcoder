@@ -59,10 +59,26 @@ resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
   bucket = aws_s3_bucket.app_bucket.id
 
   cors_rule {
-    allowed_headers = ["*"]
-    allowed_methods = ["PUT", "POST", "GET"]
     allowed_origins = ["*"]
-    expose_headers  = ["ETag"]
+
+    allowed_methods = [
+      "GET",
+      "PUT",
+      "POST",
+      "HEAD",
+      "OPTIONS"
+    ]
+
+    allowed_headers = [
+      "*"
+    ]
+
+    expose_headers = [
+      "ETag",
+      "x-amz-request-id",
+      "x-amz-id-2"
+    ]
+
     max_age_seconds = 3000
   }
 }
