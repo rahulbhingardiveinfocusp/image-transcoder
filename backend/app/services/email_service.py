@@ -4,13 +4,13 @@ import logging
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
-
+endpoint_url = settings.LOCALSTACK_ENDPOINT or None
 class EmailService:
     @classmethod
     def _get_ses_client(cls):
         return boto3.client(
             "ses",
-            endpoint_url=settings.LOCALSTACK_ENDPOINT,
+            endpoint_url=endpoint_url,
             region_name=settings.AWS_REGION,
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY

@@ -1,14 +1,14 @@
 from celery import Celery
 from app.core.config import settings
 
-
+endpoint_url = settings.LOCALSTACK_ENDPOINT or None
 celery_app = Celery("image_worker")
 celery_app.conf.update(
     broker_url=settings.SQS_QUEUE_URL, 
     task_default_queue="image-processing-queue",
     broker_transport_options={
         "region": settings.AWS_REGION,
-        "endpoint_url": settings.LOCALSTACK_ENDPOINT,
+        "endpoint_url": endpoint_url,
         "preconditions": {"sqs": {"wait_time_seconds": 20}},
     },
     # Ensure tasks are acknowledged only after completion
