@@ -33,6 +33,7 @@ export class App {
       filename: this.selectedFile.name
     }).subscribe({
       next: (res: any) => {
+         console.log('UPLOAD RESPONSE:', res);
         const uploadUrl = res.upload_url;
         
         // 2. Upload the file directly to S3 using the pre-signed URL
