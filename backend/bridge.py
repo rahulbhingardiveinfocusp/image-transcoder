@@ -6,13 +6,10 @@ from app.core.config import settings  # Import your central settings object
 endpoint_url = settings.LOCALSTACK_ENDPOINT or None
 # Use settings from your config file
 sqs = boto3.client(
-    "sqs", 
-    endpoint_url=endpoint_url , # or settings.LOCALSTACK_ENDPOINT
+    "sqs",
     region_name=settings.AWS_REGION,
-    aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-    aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+    endpoint_url=endpoint_url
 )
-
 # Use the URL from settings
 S3_EVENTS_QUEUE = settings.SQS_QUEUE_URL
 
