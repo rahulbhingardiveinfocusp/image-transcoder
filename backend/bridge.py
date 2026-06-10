@@ -3,10 +3,7 @@ import json
 import time
 from app.tasks.image_tasks import process_s3_upload_task
 from app.core.config import settings  # Import your central settings object
-if settings.ENV == "local":
-    endpoint_url = "http://localhost:4566"
-else:
-    endpoint_url = None
+endpoint_url = (settings.LOCALSTACK_ENDPOINT or "").strip() or None
 
 sqs = boto3.client(
     "sqs",
