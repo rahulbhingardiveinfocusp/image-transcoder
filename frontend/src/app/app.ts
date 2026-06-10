@@ -1,7 +1,5 @@
 import { Component } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
-// 👇 FIXED: Always import the base environment file. 
-// Angular's compiler will automatically swap this out for environment.prod during CI/CD!
 import { environment } from '../environments/environment';
 
 @Component({
@@ -11,13 +9,12 @@ import { environment } from '../environments/environment';
 })
 export class App {
   selectedFile: File | null = null;
-  // Use a fallback to prevent runtime crashes if the variable is missing
   private apiBaseUrl = environment.apiUrl;
 
-  constructor(private http: HttpClient) { }
+  constructor(private http: HttpClient) {}
 
   onFileSelected(event: any) {
-    if (event.target.files && event.target.files.length > 0) {
+    if (event.target.files?.length > 0) {
       this.selectedFile = event.target.files[0];
     }
   }
@@ -28,31 +25,36 @@ export class App {
       return;
     }
 
-    // 1. Ask FastAPI for the pre-signed URL
-    this.http.post(`${this.apiBaseUrl}/images/request-upload`, {
-      filename: this.selectedFile.name
-    }).subscribe({
-      next: (res: any) => {
-         console.log('UPLOAD RESPONSE:', res);
-        const uploadUrl = res.upload_url;
-        
-        // 2. Upload the file directly to S3 using the pre-signed URL
-        const headers = new HttpHeaders({ 'Content-Type': this.selectedFile!.type });
+    const file = this.selectedFile;
 
-        this.http.put(uploadUrl, this.selectedFile).subscribe({
+    // 1. Get presigned URL
+    this.http.post<any>(
+      `${this.apiBaseUrl}/images/request-upload`,
+      { filename: file.name ,content_type: file.type}
+    ).subscribe({
+      next: (res) => {
+        const uploadUrl = res.upload_url;
+
+        // IMPORTANT: MUST use headers in PUT request
+        const headers = new HttpHeaders({
+          'Content-Type': file.type
+        });
+
+        // 2. Upload directly to S3
+        this.http.put(uploadUrl, file, { headers }).subscribe({
           next: () => {
             alert('Upload successful!');
-            this.selectedFile = null; // Clear the selection on success
+            this.selectedFile = null;
           },
           error: (err) => {
-            console.error('S3 Direct Upload failed:', err);
-            alert('Failed to upload file to storage.');
+            console.error('S3 Upload failed:', err);
+            alert('Failed to upload file to S3.');
           }
         });
       },
       error: (err) => {
-        console.error('FastAPI Pre-signed URL generation failed:', err);
-        alert('Failed to connect to the backend server.');
+        console.error('Backend failed:', err);
+        alert('Failed to get upload URL from server.');
       }
     });
   }

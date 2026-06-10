@@ -30,15 +30,27 @@ class ImageService:
         return await loop.run_in_executor(None, func, *args)
 
     @staticmethod
-    async def get_upload_url(db: AsyncSession, filename: str):
-        new_image = Image(filename=filename, s3_key=f"raw/{filename}")
+    async def get_upload_url(db: AsyncSession, filename: str, content_type: str):
+        new_image = Image(
+            filename=filename,
+            s3_key=f"raw/{filename}"
+        )
+
         db.add(new_image)
         await db.commit()
         await db.refresh(new_image)
-        
+
         s3_service = S3Service()
-        presigned_url = s3_service.generate_presigned_url(f"raw/{filename}")
-        return {"image_id": new_image.id, "upload_url": presigned_url}
+
+        presigned_url = s3_service.generate_presigned_url(
+            object_name=f"raw/{filename}",
+            content_type=content_type
+        )
+
+        return {
+            "image_id": new_image.id,
+            "upload_url": presigned_url
+        }
 
     @classmethod
     async def process_image(cls, bucket: str, key: str):

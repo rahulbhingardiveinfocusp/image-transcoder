@@ -15,17 +15,20 @@ class S3Service:
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
             config=boto3.session.Config(signature_version='s3v4')
         )
-
-    def generate_presigned_url(self, object_name: str, client_method: str = 'put_object', expiration: int = 3600):
-        """
-        Generic method to generate presigned URLs to reduce code duplication.
-        """
+    def generate_presigned_url(
+        self,
+        object_name: str,
+        content_type: str,
+        client_method: str = "put_object",
+        expiration: int = 3600
+    ):
         try:
             return self.s3.generate_presigned_url(
                 client_method,
                 Params={
-                    'Bucket': settings.S3_BUCKET_NAME, 
-                    'Key': object_name
+                    "Bucket": settings.S3_BUCKET_NAME,
+                    "Key": object_name,
+                    "ContentType": content_type
                 },
                 ExpiresIn=expiration
             )
