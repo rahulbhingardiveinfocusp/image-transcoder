@@ -368,7 +368,7 @@ services:
       - S3_BUCKET_NAME=${var.s3_bucket_name}
       - AWS_REGION=${var.aws_region}
       - ADMIN_EMAIL=madnands5@gmail.com
-      - LOCALSTACK_ENDPOINT=""
+      - LOCALSTACK_ENDPOINT=null
       - CONTAINER_ROLE=web
     restart: unless-stopped
 
@@ -382,7 +382,7 @@ services:
       - SQS_QUEUE_URL=${replace(aws_sqs_queue.app_queue.id, "https://", "sqs://")}
       - S3_BUCKET_NAME=${var.s3_bucket_name}
       - AWS_REGION=${var.aws_region}
-      - LOCALSTACK_ENDPOINT=""
+      - LOCALSTACK_ENDPOINT=null
       - ADMIN_EMAIL=madnands5@gmail.com
       - CONTAINER_ROLE=worker 
 
