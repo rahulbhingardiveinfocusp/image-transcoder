@@ -369,6 +369,7 @@ services:
       - AWS_REGION=${var.aws_region}
       - ADMIN_EMAIL=madnands5@gmail.com
       - CONTAINER_ROLE=web
+      - LOCALSTACK_ENDPOINT=
     restart: unless-stopped
 
   celery:
@@ -383,6 +384,7 @@ services:
       - AWS_REGION=${var.aws_region}
       - ADMIN_EMAIL=madnands5@gmail.com
       - CONTAINER_ROLE=worker 
+      - LOCALSTACK_ENDPOINT=
 
     restart: unless-stopped
 
