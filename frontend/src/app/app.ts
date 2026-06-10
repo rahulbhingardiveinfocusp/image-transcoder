@@ -38,7 +38,7 @@ export class App {
         // 2. Upload the file directly to S3 using the pre-signed URL
         const headers = new HttpHeaders({ 'Content-Type': this.selectedFile!.type });
 
-        this.http.put(uploadUrl, this.selectedFile, { headers }).subscribe({
+        this.http.put(uploadUrl, this.selectedFile).subscribe({
           next: () => {
             alert('Upload successful!');
             this.selectedFile = null; // Clear the selection on success
