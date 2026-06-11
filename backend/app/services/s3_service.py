@@ -15,8 +15,6 @@ class S3Service:
             "s3",
             region_name=settings.AWS_REGION,
             endpoint_url=endpoint_url,  
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY,
             config=boto3.session.Config(signature_version="s3v4",s3={'addressing_style': 'virtual'},),
         )
 
