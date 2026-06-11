@@ -36,9 +36,6 @@ export class App {
         const uploadUrl = res.upload_url;
 
         // IMPORTANT: MUST use headers in PUT request
-        const headers = new HttpHeaders({
-          'Content-Type': file.type
-        });
 
         // 2. Upload directly to S3
         this.http.put(uploadUrl, file).subscribe({
