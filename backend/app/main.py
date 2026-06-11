@@ -21,7 +21,7 @@ app.add_middleware(
 )
 
 @app.get("/")
-def root():
-    return {"message": "Image Transcoding Service is operational"}
+def health():
+    return {"status": "ok"}
 
 app.include_router(v1_router, prefix="/images", tags=["images"])
