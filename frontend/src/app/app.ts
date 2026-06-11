@@ -36,11 +36,13 @@ export class App {
         const uploadUrl = res.upload_url;
 
         try {
-          // 2. Upload directly to S3 (NO HEADERS)
+        const blob = new Blob([file], { type: "application/octet-stream" });
+
           await fetch(uploadUrl, {
-            method: 'PUT',
-            body: file
+            method: "PUT",
+            body: blob
           });
+ 
 
           alert('Upload successful!');
           this.selectedFile = null;
