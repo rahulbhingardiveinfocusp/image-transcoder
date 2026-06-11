@@ -60,7 +60,7 @@ resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
 
   cors_rule {
     allowed_origins = [
-      "https://${aws_cloudfront_distribution.frontend_cdn.domain_name}"
+      "*"
     ]
 
     allowed_methods = ["GET", "PUT", "POST", "HEAD"]
