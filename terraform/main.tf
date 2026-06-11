@@ -62,7 +62,6 @@ resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
     allowed_origins = [
       "*"
     ]
-
     allowed_methods = ["GET", "PUT", "POST", "HEAD"]
     allowed_headers = ["*"]
     expose_headers  = ["ETag", "x-amz-server-side-encryption", "x-amz-request-id", "x-amz-id-2"]
