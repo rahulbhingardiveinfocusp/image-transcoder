@@ -30,7 +30,7 @@ export class App {
     // 1. Get presigned URL
     this.http.post<any>(
       `${this.apiBaseUrl}/images/request-upload`,
-      { filename: file.name}
+      { filename: file.name , content_type: file.type}
     ).subscribe({
       next: (res) => {
         const uploadUrl = res.upload_url;

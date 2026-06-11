@@ -20,13 +20,14 @@ class S3Service:
             config=boto3.session.Config(signature_version="s3v4",s3={'addressing_style': 'virtual'},),
         )
 
-    def generate_presigned_url(self, object_name: str, method: str = "put_object", expiration: int = 3600):
+    def generate_presigned_url(self, object_name: str,content_type:str, method: str = "put_object", expiration: int = 3600):
         try:
             return self.s3.generate_presigned_url(
                 ClientMethod=method,
                 Params={
                     "Bucket": settings.S3_BUCKET_NAME,
                     "Key": object_name,
+                    "ContentType": content_type
                 },
                 ExpiresIn=expiration,
             )
