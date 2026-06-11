@@ -318,6 +318,22 @@ resource "aws_iam_role_policy" "ec2_policy" {
   })
 }
 
+resource "aws_s3_bucket_policy" "app_bucket_upload_policy" {
+  bucket = aws_s3_bucket.app_bucket.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AllowPutObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.app_bucket.arn}/*"
+      }
+    ]
+  })
+}
 resource "aws_iam_instance_profile" "ec2_profile" { 
   name_prefix = "fastapi-prof-" 
   role        = aws_iam_role.ec2_role.name 
