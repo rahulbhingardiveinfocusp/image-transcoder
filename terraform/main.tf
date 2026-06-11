@@ -65,7 +65,7 @@ resource "aws_s3_bucket" "app_bucket" {
 
 resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
   bucket = aws_s3_bucket.app_bucket.id
-
+  
   cors_rule {
     allowed_origins = [
       "*"
@@ -77,11 +77,34 @@ resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
   }
 }
 
+resource "aws_s3_bucket_public_access_block" "app_bucket_public_access" {
+  bucket = aws_s3_bucket.app_bucket.id
+
+  block_public_acls       = true
+  block_public_policy     = false   # must be false to allow Principal = "*" policy
+  ignore_public_acls      = true
+  restrict_public_buckets = false   # must be false to allow public reads/writes
+}
 resource "aws_sqs_queue" "app_queue" { 
   name                      = var.sqs_queue_name 
   receive_wait_time_seconds = 20
 }
-
+resource "aws_s3_bucket_policy" "app_bucket_upload_policy" {
+  bucket = aws_s3_bucket.app_bucket.id
+depends_on = [aws_s3_bucket_public_access_block.app_bucket_public_access]
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid       = "AllowPutObject"
+        Effect    = "Allow"
+        Principal = "*"
+        Action    = "s3:PutObject"
+        Resource  = "${aws_s3_bucket.app_bucket.arn}/*"
+      }
+    ]
+  })
+}
 resource "aws_sqs_queue_policy" "s3_to_sqs_policy" {
   queue_url = aws_sqs_queue.app_queue.id
 
@@ -318,22 +341,7 @@ resource "aws_iam_role_policy" "ec2_policy" {
   })
 }
 
-resource "aws_s3_bucket_policy" "app_bucket_upload_policy" {
-  bucket = aws_s3_bucket.app_bucket.id
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid       = "AllowPutObject"
-        Effect    = "Allow"
-        Principal = "*"
-        Action    = "s3:PutObject"
-        Resource  = "${aws_s3_bucket.app_bucket.arn}/*"
-      }
-    ]
-  })
-}
 resource "aws_iam_instance_profile" "ec2_profile" { 
   name_prefix = "fastapi-prof-" 
   role        = aws_iam_role.ec2_role.name 
