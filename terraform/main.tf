@@ -43,6 +43,14 @@ variable "ssh_public_key" {
   description = "The public SSH key used by GitHub Actions to log into the EC2 host"
 }
 
+variable "aws_access_key_id" {
+  type = string
+}
+
+variable "aws_secret_access_key" {
+  type = string
+}
+
 provider "aws" {
   region = var.aws_region
 }
@@ -379,6 +387,8 @@ services:
       - ADMIN_EMAIL=madnands5@gmail.com
       - CONTAINER_ROLE=web
       - LOCALSTACK_ENDPOINT=
+      - AWS_ACCESS_KEY_ID=${var.aws_access_key_id}
+      - AWS_SECRET_ACCESS_KEY=${var.aws_secret_access_key}
     restart: unless-stopped
 
   celery:
@@ -395,6 +405,8 @@ services:
       - ADMIN_EMAIL=madnands5@gmail.com
       - CONTAINER_ROLE=worker 
       - LOCALSTACK_ENDPOINT=
+      - AWS_ACCESS_KEY_ID=${var.aws_access_key_id}
+      - AWS_SECRET_ACCESS_KEY=${var.aws_secret_access_key}
     restart: unless-stopped
 
 volumes:
