@@ -59,14 +59,11 @@ resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
   bucket = aws_s3_bucket.app_bucket.id
 
   cors_rule {
-    # Allow requests from your actual CloudFront distribution domain
     allowed_origins = [
       "https://${aws_cloudfront_distribution.frontend_cdn.domain_name}"
     ]
 
     allowed_methods = ["GET", "PUT", "POST", "HEAD"]
-
-    # Expose custom headers explicitly required by AWS S3 multi-part or signed operations
     allowed_headers = ["*"]
     expose_headers  = ["ETag", "x-amz-server-side-encryption", "x-amz-request-id", "x-amz-id-2"]
     max_age_seconds = 3000
@@ -97,7 +94,6 @@ resource "aws_sqs_queue_policy" "s3_to_sqs_policy" {
 
 resource "aws_s3_bucket_notification" "bucket_notification" {
   bucket     = aws_s3_bucket.app_bucket.id
-
   depends_on = [aws_sqs_queue_policy.s3_to_sqs_policy]
 
   queue {
@@ -137,14 +133,12 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
   is_ipv6_enabled     = true
   default_root_object = "index.html"
 
-  # 🟢 ORIGIN 1: Your Existing S3 Frontend Bucket
   origin {
     domain_name              = aws_s3_bucket.frontend_bucket.bucket_regional_domain_name
     origin_id                = "S3-Frontend-Bucket"
     origin_access_control_id = aws_cloudfront_origin_access_control.oac.id
   }
 
-  # 🟢 ORIGIN 2: Your EC2 Backend Server (Port 8000)
   origin {
     domain_name = aws_instance.app_server.public_dns
     origin_id   = "EC2-Backend-API"
@@ -152,23 +146,22 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
     custom_origin_config {
       http_port                = 8000
       https_port               = 443
-      origin_protocol_policy   = "http-only" # CloudFront talks to EC2 via HTTP, but browser talks to CloudFront via HTTPS
+      origin_protocol_policy   = "http-only"
       origin_ssl_protocols     = ["TLSv1.2"]
     }
   }
 
-  # 🟢 ROUTE SYSTEM: Send all API requests directly to the EC2 Backend
   ordered_cache_behavior {
-    path_pattern     = "/images/*" # 👈 Catches your upload and image endpoints
+    path_pattern     = "/images/*" 
     target_origin_id = "EC2-Backend-API"
 
     allowed_methods  = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
     cached_methods   = ["GET", "HEAD"]
-    viewer_protocol_policy = "redirect-to-https" # Forces HTTPS for the API call!
+    viewer_protocol_policy = "redirect-to-https"
 
     forwarded_values {
       query_string = true
-      headers      = ["*"] # Essential for passing headers to FastAPI
+      headers      = ["*"] 
       cookies {
         forward = "all"
       }
@@ -178,7 +171,6 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
     max_ttl     = 0
   }
 
-  # 🟢 DEFAULT ROUTE: Send everything else to the S3 Frontend
   default_cache_behavior {
     allowed_methods        = ["GET", "HEAD", "OPTIONS"]
     cached_methods         = ["GET", "HEAD"]
@@ -331,7 +323,13 @@ resource "aws_instance" "app_server" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   key_name               = "fastapi-ec2-key"
 
-  # 👇 FIXED: Streamlined script generator formatting to prevent shell truncation bugs
+  # 🟢 ENFORCES IMDSv2 Hop limit cross-boundary bridge configurations 
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 2
+  }
+
   user_data = <<EOF
 #!/bin/bash
 sudo apt-get update -y
@@ -360,16 +358,22 @@ services:
       - db_prod_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   fastapi:
     image: ${var.dockerhub_username}/${var.docker_repo}:latest
     container_name: prod-fastapi
-    network_mode: "host"
+    ports:
+      - "8000:8000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
-      # 🟢 Changed "postgres" host target to "127.0.0.1"
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/fastapi
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
       - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.id}
       - S3_BUCKET_NAME=${var.s3_bucket_name}
       - AWS_REGION=${var.aws_region}
@@ -382,7 +386,8 @@ services:
     image: ${var.dockerhub_username}/${var.docker_repo}:latest
     container_name: prod-celery
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
       - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.id}
@@ -391,7 +396,6 @@ services:
       - ADMIN_EMAIL=madnands5@gmail.com
       - CONTAINER_ROLE=worker 
       - LOCALSTACK_ENDPOINT=
-
     restart: unless-stopped
 
 volumes:
