@@ -364,12 +364,12 @@ services:
   fastapi:
     image: ${var.dockerhub_username}/${var.docker_repo}:latest
     container_name: prod-fastapi
-    ports:
-      - "8000:8000"
+    network_mode: "host"
     depends_on:
       - postgres
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
+      # 🟢 Changed "postgres" host target to "127.0.0.1"
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/fastapi
       - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.id}
       - S3_BUCKET_NAME=${var.s3_bucket_name}
       - AWS_REGION=${var.aws_region}
