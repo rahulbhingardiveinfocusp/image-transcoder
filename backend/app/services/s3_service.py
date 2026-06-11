@@ -20,6 +20,7 @@ class S3Service:
     def generate_presigned_url(
     self,
     object_name: str,
+    content_type:str,
     client_method: str = "put_object",
     expiration: int = 3600
     ):
