@@ -13,5 +13,5 @@ class UploadRequest(BaseModel):
 
 @router.post("/request-upload")
 async def request_upload(payload: UploadRequest, db: AsyncSession = Depends(get_db)):
-    result = await ImageService.get_upload_url(db, payload.filename, content_type)
+    result = await ImageService.get_upload_url(db, payload.filename, payload.content_type)
     return result

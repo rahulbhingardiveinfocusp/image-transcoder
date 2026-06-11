@@ -38,7 +38,7 @@ export class App {
         // IMPORTANT: MUST use headers in PUT request
 
         // 2. Upload directly to S3
-        this.http.put(uploadUrl, file).subscribe({
+        this.http.put(uploadUrl, file,).subscribe({
           next: () => {
             alert('Upload successful!');
             this.selectedFile = null;
