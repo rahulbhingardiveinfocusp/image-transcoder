@@ -4,11 +4,7 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-endpoint_url = (
-    settings.LOCALSTACK_ENDPOINT if settings.LOCALSTACK_ENDPOINT
-    else f"https://s3.{settings.AWS_REGION}.amazonaws.com"
-)
-
+endpoint_url = settings.LOCALSTACK_ENDPOINT if settings.LOCALSTACK_ENDPOINT else None
 class S3Service:
     def __init__(self):
         self.s3 = boto3.client(
