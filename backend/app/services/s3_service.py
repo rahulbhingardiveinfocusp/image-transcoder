@@ -20,18 +20,15 @@ class S3Service:
     def generate_presigned_url(
     self,
     object_name: str,
-    content_type:str,
-    client_method: str = "put_object",
-    expiration: int = 3600
     ):
         try:
             return self.s3.generate_presigned_url(
-                ClientMethod=client_method,  # Pass as explicit keyword argument
+                ClientMethod="put_object",  # Pass as explicit keyword argument
                 Params={
                     "Bucket": settings.S3_BUCKET_NAME,
                     "Key": object_name,
                 },
-                ExpiresIn=expiration
+                ExpiresIn=3600
             )
         except Exception as e:
             logger.error(f"Error generating presigned URL for {object_name}: {e}")
