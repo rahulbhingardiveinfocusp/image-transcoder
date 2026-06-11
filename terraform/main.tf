@@ -59,25 +59,16 @@ resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
   bucket = aws_s3_bucket.app_bucket.id
 
   cors_rule {
-    allowed_origins = ["*"]
-
-    allowed_methods = [
-      "GET",
-      "PUT",
-      "POST",
-      "HEAD",
+    # Allow requests from your actual CloudFront distribution domain
+    allowed_origins = [
+      "https://${aws_cloudfront_distribution.frontend_cdn.domain_name}"
     ]
 
-    allowed_headers = [
-      "*"
-    ]
+    allowed_methods = ["GET", "PUT", "POST", "HEAD"]
 
-    expose_headers = [
-      "ETag",
-      "x-amz-request-id",
-      "x-amz-id-2"
-    ]
-
+    # Expose custom headers explicitly required by AWS S3 multi-part or signed operations
+    allowed_headers = ["*"]
+    expose_headers  = ["ETag", "x-amz-server-side-encryption", "x-amz-request-id", "x-amz-id-2"]
     max_age_seconds = 3000
   }
 }
@@ -373,6 +364,7 @@ services:
   fastapi:
     image: ${var.dockerhub_username}/${var.docker_repo}:latest
     container_name: prod-fastapi
+    network_mode: "host"
     ports:
       - "8000:8000"
     depends_on:
@@ -394,7 +386,7 @@ services:
       - postgres
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/fastapi
-      - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.url}
+      - SQS_QUEUE_URL=${aws_sqs_queue.app_queue.id}
       - S3_BUCKET_NAME=${var.s3_bucket_name}
       - AWS_REGION=${var.aws_region}
       - ADMIN_EMAIL=madnands5@gmail.com
