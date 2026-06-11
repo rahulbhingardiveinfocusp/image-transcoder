@@ -37,20 +37,19 @@ export class App {
         next: (res) => {
           const uploadUrl = res.upload_url;
 
-          // IMPORTANT: MUST use headers in PUT request
-          const headers = new HttpHeaders({
-            'Content-Type': file.type,
-          });
-          // 2. Upload directly to S3
-          this.http.put(uploadUrl, file, { headers }).subscribe({
-            next: () => {
+          // Use fetch() instead of HttpClient to avoid Angular's default headers
+          fetch(uploadUrl, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': file.type,
+            },
+            body: file,
+          })
+            .then(() => {
               alert('Upload successful!');
               this.selectedFile = null;
-            },
-            error: (err) => {
-              console.error('S3 Upload failed:', err);
-            },
-          });
+            })
+            .catch((err) => console.error('S3 Upload failed:', err));
         },
         error: (err) => {
           console.error('Backend failed:', err);
