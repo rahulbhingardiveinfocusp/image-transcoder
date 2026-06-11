@@ -86,4 +86,3 @@ watchfiles==1.2.0
 wcwidth==0.7.0
 websockets==16.0
 gevent
-netcat-openbsd
