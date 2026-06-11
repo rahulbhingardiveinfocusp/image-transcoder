@@ -71,7 +71,7 @@ jobs:
           TF_VAR_docker_repo: ${{ secrets.DOCKER_REPO }}
           TF_VAR_ssh_public_key: ${{ secrets.TF_VAR_ssh_public_key }}
           TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          TF_VAR_aws_secret_access_key:${{ secrets.AWS_ACCESS_KEY_ID }}
+          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
         run: |
           terraform init
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
