@@ -364,7 +364,6 @@ services:
   fastapi:
     image: ${var.dockerhub_username}/${var.docker_repo}:latest
     container_name: prod-fastapi
-    network_mode: "host"
     ports:
       - "8000:8000"
     depends_on:
