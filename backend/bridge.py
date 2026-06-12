@@ -33,7 +33,12 @@ while True:
         if 'Messages' in response:
             for msg in response['Messages']:
                 logger.info(f"Received event message ID: {msg['MessageId']}")
-                body = json.loads(msg['Body'])
+                try:
+                    body = json.loads(msg['Body'])
+                except json.JSONDecodeError:
+                    logger.warning(f"Skipping non-JSON message: {msg['MessageId']}")
+                    sqs.delete_message(QueueUrl=S3_EVENTS_QUEUE, ReceiptHandle=msg['ReceiptHandle'])
+                    continue
                 
                 # Verify message contains structural S3 notification records
                 if "Records" in body:
