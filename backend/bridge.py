@@ -20,7 +20,7 @@ while True:
         response = sqs.receive_message(QueueUrl=S3_EVENTS_QUEUE, WaitTimeSeconds=20)
         if 'Messages' in response:
             for msg in response['Messages']:
-                print(f"[*] Received message")
+                print(f"[*] Received message:{msg}")
                 body = json.loads(msg['Body'])
                 
                 # Check for S3 notification records
