@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str
     LOCALSTACK_ENDPOINT: str
     ADMIN_EMAIL:str
+    CELERY_QUEUE_NAME: str = "celery-task-queue" 
     
     class Config:
         env_file = ".env"

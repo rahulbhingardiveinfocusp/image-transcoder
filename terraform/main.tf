@@ -51,6 +51,12 @@ variable "aws_secret_access_key" {
   type = string
 }
 
+variable "celery_queue_name" {
+  description = "Name of the Celery task queue"
+  type        = string
+}
+
+
 provider "aws" {
   region = var.aws_region
 }
@@ -115,6 +121,7 @@ resource "aws_sqs_queue_policy" "s3_to_sqs_policy" {
       Principal = { Service = "s3.amazonaws.com" }
       Action    = "sqs:SendMessage"
       Resource  = aws_sqs_queue.app_queue.arn
+      
       Condition = { 
         ArnEquals = { "aws:SourceArn" = aws_s3_bucket.app_bucket.arn } 
       }
@@ -131,6 +138,61 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
     events        = ["s3:ObjectCreated:*"]
     filter_prefix = "raw/"
   }
+}
+
+# Create the queue
+resource "aws_sqs_queue" "celery_task_queue" {
+  name                       = var.celery_queue_name
+  visibility_timeout_seconds = 3600
+  receive_wait_time_seconds  = 20
+}
+
+# Allow IAM role to access it
+resource "aws_sqs_queue_policy" "celery_queue_policy" {
+  queue_url = aws_sqs_queue.celery_task_queue.url
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow"
+      Principal = { AWS = aws_iam_role.ec2_role.arn }
+      Action    = ["sqs:SendMessage", "sqs:ReceiveMessage", "sqs:DeleteMessage"]
+      Resource  = aws_sqs_queue.celery_task_queue.arn
+    }]
+  })
+}
+resource "aws_iam_role_policy" "ec2_policy" {
+  name_prefix = "fastapi-policy-"
+  role        = aws_iam_role.ec2_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      { 
+        Effect   = "Allow" 
+        Action   = ["s3:*"] 
+        Resource = [aws_s3_bucket.app_bucket.arn, "${aws_s3_bucket.app_bucket.arn}/*"] 
+      },
+      { 
+        Effect   = "Allow" 
+        Action   = ["sqs:*"] 
+        Resource = [
+          aws_sqs_queue.app_queue.arn,
+          aws_sqs_queue.celery_task_queue.arn
+        ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["sqs:ListQueues"]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# Output the URL for use in app config
+output "celery_task_queue_url" {
+  value = aws_sqs_queue.celery_task_queue.url
 }
 
 # =========================================================================
@@ -315,31 +377,7 @@ resource "aws_iam_role" "ec2_role" {
   })
 }
 
-resource "aws_iam_role_policy" "ec2_policy" {
-  name_prefix = "fastapi-policy-"
-  role        = aws_iam_role.ec2_role.id
 
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      { 
-        Effect   = "Allow" 
-        Action   = ["s3:*"] 
-        Resource = [aws_s3_bucket.app_bucket.arn, "${aws_s3_bucket.app_bucket.arn}/*"] 
-      },
-      { 
-        Effect   = "Allow" 
-        Action   = ["sqs:*"] 
-        Resource = aws_sqs_queue.app_queue.arn 
-      },
-      {
-        Effect   = "Allow"
-        Action   = ["sqs:ListQueues"]
-        Resource = "*"
-      }
-    ]
-  })
-}
 
 
 resource "aws_iam_instance_profile" "ec2_profile" { 
@@ -411,6 +449,8 @@ services:
       - ADMIN_EMAIL=madnands5@gmail.com
       - CONTAINER_ROLE=web
       - LOCALSTACK_ENDPOINT=
+      - CELERY_QUEUE_NAME=${var.celery_queue_name}
+      - CELERY_TASK_QUEUE_URL=${aws_sqs_queue.celery_task_queue.url}
     restart: unless-stopped
 
   celery:
@@ -427,6 +467,8 @@ services:
       - ADMIN_EMAIL=madnands5@gmail.com
       - CONTAINER_ROLE=worker 
       - LOCALSTACK_ENDPOINT=
+      - CELERY_QUEUE_NAME=${var.celery_queue_name}
+      - CELERY_TASK_QUEUE_URL=${aws_sqs_queue.celery_task_queue.url}
     restart: unless-stopped
 
 volumes:

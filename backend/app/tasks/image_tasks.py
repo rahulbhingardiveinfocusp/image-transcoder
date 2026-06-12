@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
     bind=True, 
     max_retries=3, 
     default_retry_delay=60, 
-    queue="image-processing-queue"
+    queue=settings.CELERY_QUEUE_NAME
 )
 def process_s3_upload_task(self, bucket: str, key: str):
     """

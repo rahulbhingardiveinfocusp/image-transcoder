@@ -14,7 +14,7 @@ celery_app.conf.update(
     broker_url=f"sqs://@{endpoint_url.split('//')[-1]}" if endpoint_url else "sqs://",
 
     # Dedicate this worker to the Celery task queue
-    task_default_queue="image-processing-queue",
+    task_default_queue=settings.CELERY_QUEUE_NAME,
 
     broker_transport_options={
         "region": settings.AWS_REGION,
@@ -24,7 +24,7 @@ celery_app.conf.update(
         "queue_name_prefix": "",
         "create_missing_queues": False, # Infrastructure should be managed via AWS/Terraform
         "predefined_queues": {
-            "image-processing-queue": {
+            settings.CELERY_QUEUE_NAME: {
                 "url": settings.CELERY_TASK_QUEUE_URL 
             }
         }
