@@ -1,5 +1,6 @@
 import asyncio
 import logging
+from typing import Any, Callable  # Added missing type imports
 from urllib.parse import unquote
 import boto3
 from sqlalchemy import select
@@ -12,6 +13,7 @@ from app.services.s3_service import S3Service
 
 logger = logging.getLogger(__name__)
 endpoint_url = settings.LOCALSTACK_ENDPOINT or None
+
 class ImageService:
     @classmethod
     def _get_s3_client(cls):
@@ -21,14 +23,18 @@ class ImageService:
             region_name=settings.AWS_REGION
         )
 
-    @staticmethod
-    async def _run_in_executor(func, *args):
-        """Helper to run blocking sync functions without blocking the loop."""
-        loop = asyncio.get_event_loop()
-        return await loop.run_in_executor(None, func, *args)
+    @classmethod
+    async def _run_in_executor(cls, func: Callable, *args: Any, **kwargs: Any) -> Any:
+        """
+        Helper to execute synchronous/blocking boto3 operations 
+        safely inside the async event loop.
+        """
+        loop = asyncio.get_running_loop()
+        # Use a lambda to pass both positional arguments and keyword arguments to the function
+        return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
 
     @staticmethod
-    async def get_upload_url(db: AsyncSession, filename: str, content_type:str):
+    async def get_upload_url(db: AsyncSession, filename: str, content_type: str):
         new_image = Image(
             filename=filename,
             s3_key=f"raw/{filename}"
@@ -65,11 +71,20 @@ class ImageService:
                 return False
                 
             try:
-                # Wrap blocking S3 calls in executor
-                await cls._run_in_executor(s3.copy_object, {
-                    'Bucket': bucket, 'CopySource': {'Bucket': bucket, 'Key': decoded_key}, 'Key': new_key
-                })
-                await cls._run_in_executor(s3.delete_object, {'Bucket': bucket, 'Key': decoded_key})
+                # FIXED: Removed the curly braces to pass arguments as pure kwargs
+                await cls._run_in_executor(
+                    s3.copy_object, 
+                    Bucket=bucket, 
+                    CopySource={'Bucket': bucket, 'Key': decoded_key}, 
+                    Key=new_key
+                )
+                
+                # FIXED: Removed curly braces here as well
+                await cls._run_in_executor(
+                    s3.delete_object, 
+                    Bucket=bucket, 
+                    Key=decoded_key
+                )
                 
                 image_record.s3_key = new_key
                 image_record.status = "COMPLETED"
@@ -90,4 +105,5 @@ class ImageService:
     @classmethod
     async def upload_thumbnail(cls, bucket: str, key: str, data: bytes):
         s3 = cls._get_s3_client()
+        # This will now succeed perfectly because _run_in_executor collects kwargs correctly
         await cls._run_in_executor(s3.put_object, Bucket=bucket, Key=key, Body=data)
