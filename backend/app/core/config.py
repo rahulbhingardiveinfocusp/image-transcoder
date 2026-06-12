@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     LOCALSTACK_ENDPOINT: str
     ADMIN_EMAIL:str
     CELERY_QUEUE_NAME: str = "celery-task-queue" 
+    CELERY_TASK_QUEUE_URL: str  
     
     class Config:
         env_file = ".env"
