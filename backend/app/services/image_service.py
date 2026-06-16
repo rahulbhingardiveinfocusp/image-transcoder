@@ -1,123 +1,123 @@
 import asyncio
 import logging
-from typing import Any, Callable  # Added missing type imports
+from typing import Any, Callable
 from urllib.parse import unquote
+
 import boto3
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.database import AsyncSessionLocal
 from app.models.image import Image
 from app.services.s3_service import S3Service
 
 logger = logging.getLogger(__name__)
 endpoint_url = settings.LOCALSTACK_ENDPOINT or None
 
+
 class ImageService:
+
     @classmethod
     def _get_s3_client(cls):
         return boto3.client(
             "s3",
             endpoint_url=endpoint_url,
-            region_name=settings.AWS_REGION
+            region_name=settings.AWS_REGION,
         )
 
     @classmethod
     async def _run_in_executor(cls, func: Callable, *args: Any, **kwargs: Any) -> Any:
-        """
-        Helper to execute synchronous/blocking boto3 operations 
-        safely inside the async event loop.
-        """
         loop = asyncio.get_running_loop()
-        # Use a lambda to pass both positional arguments and keyword arguments to the function
         return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
 
     @staticmethod
     async def get_upload_url(db: AsyncSession, filename: str, content_type: str):
-        new_image = Image(
-            filename=filename,
-            s3_key=""
-        )
+        new_image = Image(filename=filename, s3_key="")
         try:
             db.add(new_image)
             await db.flush()
-
             new_image.s3_key = f"raw/{new_image.id}-{filename}"
-
             await db.commit()
             await db.refresh(new_image)
-
-            s3_service = S3Service()
-
-            presigned_url = s3_service.generate_presigned_url(
-                object_name=new_image.s3_key,
-                content_type=content_type
-            )
-
-            return {
-                "image_id": new_image.id,
-                "upload_url": presigned_url
-            }
         except Exception:
             await db.rollback()
             raise
 
-    @classmethod
-    async def process_image(cls, bucket: str, key: str):
+        presigned_url = S3Service().generate_presigned_url(
+            object_name=new_image.s3_key,
+            content_type=content_type,
+        )
+        return {"image_id": new_image.id, "upload_url": presigned_url}
+
+    @staticmethod
+    async def already_processed(session: AsyncSession, bucket: str, key: str) -> bool:
+        # Fix 1: was querying non-existent Image.bucket / Image.key columns.
+        # Fix 2: was missing the return statement entirely — always returned None.
+        result = await session.execute(
+            select(Image).where(
+                Image.s3_key == key,
+                Image.status == "COMPLETED",
+            )
+        )
+        return result.scalar_one_or_none() is not None
+
+    @classmethod  # Fix 3: was @staticmethod but used cls — NameError at runtime.
+    async def process_image(cls, session: AsyncSession, bucket: str, key: str) -> bool:
         decoded_key = unquote(key)
         new_key = f"processed/{decoded_key.split('/')[-1]}"
         s3 = cls._get_s3_client()
 
-        async with AsyncSessionLocal() as db:
-            result = await db.execute(select(Image).where(Image.s3_key == decoded_key))
-            image_record = result.scalars().first()
-            
-            if not image_record:
-                logger.error(f"Record not found: {decoded_key}")
-                return False
-                
-            try:
-                await cls._run_in_executor(
-                    s3.copy_object,
-                    Bucket=bucket,
-                    CopySource={"Bucket": bucket, "Key": decoded_key},
-                    Key=new_key,
-                )
+        # Fix 4: was ignoring the injected session and opening AsyncSessionLocal()
+        # internally — the whole source of the "another operation is in progress" error.
+        result = await session.execute(
+            select(Image).where(Image.s3_key == decoded_key)
+        )
+        image_record = result.scalars().first()
 
-                image_record.s3_key = new_key
-                image_record.status = "COMPLETED"
+        if not image_record:
+            logger.error("Record not found for key: %s", decoded_key)
+            return False
 
-                await db.commit()
+        # S3 copy before any DB mutation — if this fails, nothing is dirty.
+        try:
+            await cls._run_in_executor(
+                s3.copy_object,
+                Bucket=bucket,
+                CopySource={"Bucket": bucket, "Key": decoded_key},
+                Key=new_key,
+            )
+        except Exception:
+            logger.exception("S3 copy failed for %s", decoded_key)
+            return False
 
-            except Exception:
-                await db.rollback()
-                logger.exception("Error processing image")
-                return False
+        # Mutate the record; caller is responsible for commit/rollback.
+        image_record.s3_key = new_key
+        image_record.status = "COMPLETED"
 
-            try:
-                await cls._run_in_executor(
-                    s3.delete_object,
-                    Bucket=bucket,
-                    Key=decoded_key,
-                )
-            except Exception:
-                logger.warning(
-                    "Failed deleting original object %s",
-                    decoded_key,
-                    exc_info=True,
-                )
-            return True
+        # Best-effort delete of the original — non-fatal.
+        try:
+            await cls._run_in_executor(
+                s3.delete_object,
+                Bucket=bucket,
+                Key=decoded_key,
+            )
+        except Exception:
+            logger.warning(
+                "Failed to delete original object %s (non-fatal)",
+                decoded_key,
+                exc_info=True,
+            )
+
+        return True
 
     @classmethod
     async def download_image(cls, bucket: str, key: str) -> bytes:
         s3 = cls._get_s3_client()
-        def _download():
-            return s3.get_object(Bucket=bucket, Key=key)['Body'].read()
-        return await cls._run_in_executor(_download)
+        return await cls._run_in_executor(
+            lambda: s3.get_object(Bucket=bucket, Key=key)["Body"].read()
+        )
 
     @classmethod
-    async def upload_thumbnail(cls, bucket: str, key: str, data: bytes):
+    async def upload_thumbnail(cls, bucket: str, key: str, data: bytes) -> None:
         s3 = cls._get_s3_client()
-        # This will now succeed perfectly because _run_in_executor collects kwargs correctly
         await cls._run_in_executor(s3.put_object, Bucket=bucket, Key=key, Body=data)
