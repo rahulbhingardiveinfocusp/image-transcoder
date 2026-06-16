@@ -39,28 +39,29 @@ class ImageService:
             filename=filename,
             s3_key=""
         )
+        try:
+            db.add(new_image)
+            await db.flush()
 
-        db.add(new_image)
-        await db.flush()
+            new_image.s3_key = f"raw/{new_image.id}-{filename}"
 
-        new_image.s3_key = f"raw/{new_image.id}-{filename}"
+            await db.commit()
+            await db.refresh(new_image)
 
-        await db.commit()
-        await db.refresh(new_image)
+            s3_service = S3Service()
 
+            presigned_url = s3_service.generate_presigned_url(
+                object_name=new_image.s3_key,
+                content_type=content_type
+            )
 
-
-        s3_service = S3Service()
-
-        presigned_url = s3_service.generate_presigned_url(
-            object_name=new_image.s3_key,
-            content_type=content_type
-        )
-
-        return {
-            "image_id": new_image.id,
-            "upload_url": presigned_url
-        }
+            return {
+                "image_id": new_image.id,
+                "upload_url": presigned_url
+            }
+        except Exception:
+            await db.rollback()
+            raise
 
     @classmethod
     async def process_image(cls, bucket: str, key: str):
