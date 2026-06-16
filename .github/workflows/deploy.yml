@@ -77,7 +77,9 @@ jobs:
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
             terraform apply -auto-approve
             REAL_IP=$(terraform output -raw server_public_ip)
+            INSTANCE_ID=$(terraform output -raw server_instance_id)
             echo "fetched_ip=$REAL_IP" >> $GITHUB_OUTPUT
+            echo "fetched_instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
           else
             terraform destroy -auto-approve
           fi
@@ -138,14 +140,23 @@ jobs:
           fi
 
       # --- STEP E: TELL EC2 WORKER TO RUN THE NEW IMAGE ---
-      - name: SSH & Refresh Live Docker Containers
-        uses: appleboy/ssh-action@v1.0.3
-        if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
-        with:
-          host: ${{ steps.terraform_step.outputs.fetched_ip }}
-          username: ubuntu
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            cd /home/ubuntu/app
-            sudo docker-compose pull fastapi celery
-            sudo docker-compose up -d --force-recreate fastapi celery
+      # --- STEP E: TELL EC2 WORKER TO RUN THE NEW IMAGE VIA AWS SSM ---
+      - name: Refresh Live Docker Containers via AWS Systems Manager
+        if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_instance_id != ''
+        run: |
+          echo "Sending deployment command to instance: ${{ steps.terraform_step.outputs.fetched_instance_id }}"
+          
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "${{ steps.terraform_step.outputs.fetched_instance_id }}" \
+            --document-name "AWS-RunShellScript" \
+            --parameters 'commands=["cd /home/ubuntu/app", "sudo docker-compose pull fastapi celery", "sudo docker-compose up -d --force-recreate fastapi celery"]' \
+            --query "Command.CommandId" \
+            --output text)
+          
+          echo "Command sent successfully. ID: $COMMAND_ID"
+          echo "Waiting for command execution to finish..."
+          
+          # Optional: Block and wait until the script finishes running on the EC2 host to verify success
+          aws ssm wait command-executed \
+            --command-id "$COMMAND_ID" \
+            --instance-id "${{ steps.terraform_step.outputs.fetched_instance_id }}"

@@ -190,6 +190,12 @@ resource "aws_iam_role_policy" "ec2_policy" {
   })
 }
 
+# Attach SSM managed policy so the agent can register and communicate with AWS
+resource "aws_iam_role_policy_attachment" "ec2_ssm_policy" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 # Output the URL for use in app config
 output "celery_task_queue_url" {
   value = aws_sqs_queue.celery_task_queue.url
@@ -330,13 +336,6 @@ resource "aws_s3_bucket_policy" "allow_cloudfront" {
 resource "aws_security_group" "app_sg" {
   name_prefix = "fastapi-sg-"
   description = "Allow web, api, and ssh traffic"
-
-  ingress { 
-    from_port   = 22 
-    to_port     = 22 
-    protocol    = "tcp" 
-    cidr_blocks = ["0.0.0.0/0"] 
-  }
 
   ingress { 
     from_port   = 80 
@@ -502,4 +501,8 @@ output "frontend_url" {
 output "frontend_cdn_id" {
   value       = aws_cloudfront_distribution.frontend_cdn.id
   description = "The ID of the CloudFront distribution to run CDN cache invalidations"
+}
+output "server_instance_id" {
+  value       = aws_instance.app_server.id
+  description = "The ID of the EC2 instance for target matching in SSM"
 }
