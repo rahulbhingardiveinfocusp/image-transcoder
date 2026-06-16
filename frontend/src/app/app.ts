@@ -1,7 +1,10 @@
 import { Component } from '@angular/core';
 import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { environment } from '../environments/environment';
-
+type PreSignedResponse = {
+  image_id: string;
+  upload_url: string;
+};
 @Component({
   selector: 'app-root',
   templateUrl: './app.html',
@@ -19,7 +22,7 @@ export class App {
     }
   }
 
-  onUpload() {
+  async onUpload() {
     if (!this.selectedFile) {
       alert('Please select a file first!');
       return;
@@ -34,7 +37,8 @@ export class App {
         content_type: file.type,
       })
       .subscribe({
-        next: (res) => {
+        next: (res: PreSignedResponse) => {
+          
           const uploadUrl = res.upload_url;
 
           // Use fetch() instead of HttpClient to avoid Angular's default headers
@@ -45,11 +49,19 @@ export class App {
             },
             body: file,
           })
-            .then(() => {
+            .then(async(res) => {
+              if (!res.ok) {
+                throw new Error(`S3 upload failed: ${res.status}`);
+              }
+
               alert('Upload successful!');
               this.selectedFile = null;
             })
-            .catch((err) => console.error('S3 Upload failed:', err));
+            .catch((err) => 
+              {
+                console.error('S3 Upload failed:', err);
+                 alert('S3 Upload failed');
+              })
         },
         error: (err) => {
           console.error('Backend failed:', err);
