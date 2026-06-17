@@ -68,9 +68,6 @@ jobs:
           TF_VAR_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
           TF_VAR_dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
           TF_VAR_docker_repo: ${{ secrets.DOCKER_REPO }}
-          TF_VAR_ssh_public_key: ${{ secrets.TF_VAR_ssh_public_key }}
-          TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          TF_VAR_aws_secret_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           TF_VAR_celery_queue_name: ${{ secrets.CELERY_QUEUE_NAME }}
         run: |
           terraform init

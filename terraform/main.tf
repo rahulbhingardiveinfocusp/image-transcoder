@@ -38,18 +38,6 @@ variable "docker_repo" {
   type    = string 
 }
 
-variable "ssh_public_key" {
-  type        = string
-  description = "The public SSH key used by GitHub Actions to log into the EC2 host"
-}
-
-variable "aws_access_key_id" {
-  type = string
-}
-
-variable "aws_secret_access_key" {
-  type = string
-}
 
 variable "celery_queue_name" {
   description = "Name of the Celery task queue"
@@ -326,14 +314,8 @@ resource "aws_s3_bucket_policy" "allow_cloudfront" {
 # =========================================================================
 resource "aws_security_group" "app_sg" {
   name_prefix = "fastapi-sg-"
-  description = "Allow web, api, and ssh traffic"
+  description = "Allow web, api, traffic"
 
-  ingress { 
-    from_port   = 22 
-    to_port     = 22 
-    protocol    = "tcp" 
-    cidr_blocks = ["0.0.0.0/0"] 
-  }
 
   ingress { 
     from_port   = 80 
@@ -413,7 +395,6 @@ mkdir -p /home/ubuntu/app
 cd /home/ubuntu/app
 
 cat << 'DOCKER_COMPOSE' > docker-compose.yml
-version: "3.8"
 
 services:
   postgres:
