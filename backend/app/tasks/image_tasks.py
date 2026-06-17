@@ -25,8 +25,6 @@ def process_s3_upload_task(self, bucket: str, key: str):
     try:
         return loop.run_until_complete(run_processing_logic(bucket, key))
     except Exception as exc:
-        # Route failures through Celery's retry machinery so max_retries
-        # and default_retry_delay are actually respected.
         try:
             raise self.retry(exc=exc)
         except MaxRetriesExceededError:
@@ -40,63 +38,33 @@ def process_s3_upload_task(self, bucket: str, key: str):
 
 
 async def run_processing_logic(bucket: str, key: str) -> dict:
-    # Decode once into a new variable — keeps the original parameter intact
-    # and makes it obvious that decoded_key is what everything downstream uses.
     decoded_key = urllib.parse.unquote(key)
 
-    # Fix: declare thumbnail_key before the try block so it's always in scope
-    # for the return statement, even if an early branch or finally clause raises.
     thumbnail_key: str | None = None
-
-    # pool_size=1 — a per-task engine never needs more than one connection.
     engine = create_async_engine(
         settings.DATABASE_URL,
         pool_size=1,
         pool_pre_ping=True,
     )
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
-
     try:
         async with session_factory() as session:
-            # ----------------------------------------------------------
-            # Idempotency guard
-            # ----------------------------------------------------------
             if await ImageService.already_processed(session, bucket, decoded_key):
                 logger.info("[-] Already completed, skipping: %s", decoded_key)
                 return {"status": "already_processed"}
-
-            # ----------------------------------------------------------
-            # 1. Download source image
-            # ----------------------------------------------------------
             image_data = await ImageService.download_image(bucket, decoded_key)
-
-            # ----------------------------------------------------------
-            # 2. Generate thumbnail (CPU-bound — offloaded to thread pool)
-            # ----------------------------------------------------------
             thumbnail_data = await asyncio.to_thread(_generate_thumbnail, image_data)
-
-            # ----------------------------------------------------------
-            # 3. Upload thumbnail
-            # ----------------------------------------------------------
             filename = decoded_key.split("/")[-1]
             thumbnail_key = f"thumbnails/{filename}"
             await ImageService.upload_thumbnail(bucket, thumbnail_key, thumbnail_data)
-
-            # ----------------------------------------------------------
-            # 4. Move original and mark record COMPLETED
-            # ----------------------------------------------------------
             success = await ImageService.process_image(session, bucket, decoded_key)
             if not success:
                 raise RuntimeError(
                     f"Failed to finalise processing for {bucket}/{decoded_key}"
                 )
-
-            # Single commit after all mutations — atomicity across the pipeline.
             await session.commit()
 
     finally:
-        # Dispose before the event loop closes so asyncpg connections are
-        # cleanly returned rather than forcibly dropped.
         await engine.dispose()
 
     logger.info(
@@ -111,7 +79,6 @@ async def run_processing_logic(bucket: str, key: str) -> dict:
 
 
 def _generate_thumbnail(data: bytes) -> bytes:
-    """CPU-bound image reduction — runs in a thread pool via asyncio.to_thread."""
     with PILImage.open(BytesIO(data)) as im:
         if im.mode in ("RGBA", "P"):
             im = im.convert("RGB")

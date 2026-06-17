@@ -51,8 +51,6 @@ class ImageService:
 
     @staticmethod
     async def already_processed(session: AsyncSession, bucket: str, key: str) -> bool:
-        # Fix 1: was querying non-existent Image.bucket / Image.key columns.
-        # Fix 2: was missing the return statement entirely — always returned None.
         result = await session.execute(
             select(Image).where(
                 Image.s3_key == key,
@@ -61,14 +59,11 @@ class ImageService:
         )
         return result.scalar_one_or_none() is not None
 
-    @classmethod  # Fix 3: was @staticmethod but used cls — NameError at runtime.
+    @classmethod  
     async def process_image(cls, session: AsyncSession, bucket: str, key: str) -> bool:
         decoded_key = unquote(key)
-        new_key = f"processed/{decoded_key.split('/')[-1]}"
         s3 = cls._get_s3_client()
 
-        # Fix 4: was ignoring the injected session and opening AsyncSessionLocal()
-        # internally — the whole source of the "another operation is in progress" error.
         result = await session.execute(
             select(Image).where(Image.s3_key == decoded_key)
         )
@@ -77,24 +72,7 @@ class ImageService:
         if not image_record:
             logger.error("Record not found for key: %s", decoded_key)
             return False
-
-        # S3 copy before any DB mutation — if this fails, nothing is dirty.
-        try:
-            await cls._run_in_executor(
-                s3.copy_object,
-                Bucket=bucket,
-                CopySource={"Bucket": bucket, "Key": decoded_key},
-                Key=new_key,
-            )
-        except Exception:
-            logger.exception("S3 copy failed for %s", decoded_key)
-            return False
-
-        # Mutate the record; caller is responsible for commit/rollback.
-        image_record.s3_key = new_key
         image_record.status = "COMPLETED"
-
-        # Best-effort delete of the original — non-fatal.
         try:
             await cls._run_in_executor(
                 s3.delete_object,
@@ -107,9 +85,8 @@ class ImageService:
                 decoded_key,
                 exc_info=True,
             )
-
         return True
-
+    
     @classmethod
     async def download_image(cls, bucket: str, key: str) -> bytes:
         s3 = cls._get_s3_client()
