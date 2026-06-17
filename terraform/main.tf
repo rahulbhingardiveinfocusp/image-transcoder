@@ -503,3 +503,8 @@ output "frontend_cdn_id" {
   value       = aws_cloudfront_distribution.frontend_cdn.id
   description = "The ID of the CloudFront distribution to run CDN cache invalidations"
 }
+# 🟢 ADD THIS MISSING BLOCK BACK IN:
+output "server_instance_id" {
+  value       = aws_instance.app_server.id
+  description = "The ID of the EC2 instance for target matching in SSM"
+}
