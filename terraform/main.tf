@@ -38,7 +38,6 @@ variable "docker_repo" {
   type    = string 
 }
 
-
 variable "aws_access_key_id" {
   type = string
 }
@@ -51,7 +50,6 @@ variable "celery_queue_name" {
   description = "Name of the Celery task queue"
   type        = string
 }
-
 
 provider "aws" {
   region = var.aws_region
@@ -69,9 +67,7 @@ resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
   bucket = aws_s3_bucket.app_bucket.id
   
   cors_rule {
-    allowed_origins = [
-      "*"
-    ]
+    allowed_origins = ["*"]
     allowed_methods = ["GET", "PUT", "POST", "HEAD"]
     allowed_headers = ["*"]
     expose_headers  = ["ETag", "x-amz-server-side-encryption", "x-amz-request-id", "x-amz-id-2"]
@@ -83,14 +79,14 @@ resource "aws_s3_bucket_public_access_block" "app_bucket_public_access" {
   bucket = aws_s3_bucket.app_bucket.id
 
   block_public_acls       = true
-  block_public_policy     = false   # must be false to allow Principal = "*" policy
+  block_public_policy     = false   
   ignore_public_acls      = true
-  restrict_public_buckets = false   # must be false to allow public reads/writes
+  restrict_public_buckets = false   
 }
 
 resource "aws_s3_bucket_policy" "app_bucket_upload_policy" {
-  bucket = aws_s3_bucket.app_bucket.id
-depends_on = [aws_s3_bucket_public_access_block.app_bucket_public_access]
+  bucket     = aws_s3_bucket.app_bucket.id
+  depends_on = [aws_s3_bucket_public_access_block.app_bucket_public_access]
   policy = jsonencode({
     Version = "2012-10-17"
     Statement = [
@@ -120,7 +116,6 @@ resource "aws_sqs_queue_policy" "s3_to_sqs_policy" {
       Principal = { Service = "s3.amazonaws.com" }
       Action    = "sqs:SendMessage"
       Resource  = aws_sqs_queue.app_queue.arn
-      
       Condition = { 
         ArnEquals = { "aws:SourceArn" = aws_s3_bucket.app_bucket.arn } 
       }
@@ -146,7 +141,8 @@ resource "aws_sqs_queue" "celery_task_queue" {
 }
 
 resource "aws_sqs_queue_policy" "celery_queue_policy" {
-  queue_url = aws_sqs_queue.celery_task_queue.url
+  queue_url  = aws_sqs_queue.celery_task_queue.url
+  depends_on = [aws_iam_role.ec2_role] # FIX: Prevents race condition crash on cold apply
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -158,6 +154,7 @@ resource "aws_sqs_queue_policy" "celery_queue_policy" {
     }]
   })
 }
+
 resource "aws_iam_role_policy" "ec2_policy" {
   name_prefix = "fastapi-policy-"
   role        = aws_iam_role.ec2_role.id
@@ -187,14 +184,9 @@ resource "aws_iam_role_policy" "ec2_policy" {
   })
 }
 
-
 resource "aws_iam_role_policy_attachment" "ec2_ssm_policy" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
-}
-
-output "celery_task_queue_url" {
-  value = aws_sqs_queue.celery_task_queue.url
 }
 
 # =========================================================================
@@ -249,16 +241,14 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
     path_pattern     = "/images/*" 
     target_origin_id = "EC2-Backend-API"
 
-    allowed_methods  = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
-    cached_methods   = ["GET", "HEAD"]
+    allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]
+    cached_methods         = ["GET", "HEAD"]
     viewer_protocol_policy = "redirect-to-https"
 
     forwarded_values {
       query_string = true
       headers      = ["*"] 
-      cookies {
-        forward = "all"
-      }
+      cookies { forward = "all" }
     }
     min_ttl     = 0
     default_ttl = 0
@@ -372,9 +362,6 @@ resource "aws_iam_role" "ec2_role" {
   })
 }
 
-
-
-
 resource "aws_iam_instance_profile" "ec2_profile" { 
   name_prefix = "fastapi-prof-" 
   role        = aws_iam_role.ec2_role.name 
@@ -394,17 +381,22 @@ resource "aws_instance" "app_server" {
   }
 
   user_data = <<EOF
-
+#!/bin/bash
+# Send console output to syslog for native tracking
+exec > >(tee /var/log/user-data.log|logger -t user-data -s2>/dev/console) 2>&1
 
 sudo apt-get update -y
 sudo apt-get install docker.io -y
 sudo systemctl start docker
 sudo systemctl enable docker
 
+# FIX: Install docker-compose binary into an explicit path accessible by non-login shells
 sudo curl -L "https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 sudo chmod +x /usr/local/bin/docker-compose
 
+# FIX: Set up absolute folder layout and grant permission context to the default ubuntu user
 mkdir -p /home/ubuntu/app
+chown -R ubuntu:ubuntu /home/ubuntu/app
 cd /home/ubuntu/app
 
 cat << 'DOCKER_COMPOSE' > docker-compose.yml
@@ -470,8 +462,8 @@ volumes:
   db_prod_data:
 DOCKER_COMPOSE
 
-sleep 30
-sudo docker-compose up -d
+sleep 15
+sudo /usr/local/bin/docker-compose up -d
 EOF
 
   tags = { 
@@ -490,6 +482,10 @@ output "sqs_production_url" {
   value = aws_sqs_queue.app_queue.id 
 }
 
+output "celery_task_queue_url" {
+  value = aws_sqs_queue.celery_task_queue.url
+}
+
 output "frontend_url" {
   value = "https://${aws_cloudfront_distribution.frontend_cdn.domain_name}"
 }
@@ -498,6 +494,7 @@ output "frontend_cdn_id" {
   value       = aws_cloudfront_distribution.frontend_cdn.id
   description = "The ID of the CloudFront distribution to run CDN cache invalidations"
 }
+
 output "server_instance_id" {
   value       = aws_instance.app_server.id
   description = "The ID of the EC2 instance for target matching in SSM"
