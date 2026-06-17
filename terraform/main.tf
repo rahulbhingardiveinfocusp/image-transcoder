@@ -38,10 +38,6 @@ variable "docker_repo" {
   type    = string 
 }
 
-variable "ssh_public_key" {
-  type        = string
-  description = "The public SSH key used by GitHub Actions to log into the EC2 host"
-}
 
 variable "aws_access_key_id" {
   type = string
