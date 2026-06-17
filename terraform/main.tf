@@ -91,10 +91,7 @@ resource "aws_s3_bucket_public_access_block" "app_bucket_public_access" {
   ignore_public_acls      = true
   restrict_public_buckets = false   # must be false to allow public reads/writes
 }
-resource "aws_sqs_queue" "app_queue" { 
-  name                      = var.sqs_queue_name 
-  receive_wait_time_seconds = 20
-}
+
 resource "aws_s3_bucket_policy" "app_bucket_upload_policy" {
   bucket = aws_s3_bucket.app_bucket.id
 depends_on = [aws_s3_bucket_public_access_block.app_bucket_public_access]
@@ -111,6 +108,12 @@ depends_on = [aws_s3_bucket_public_access_block.app_bucket_public_access]
     ]
   })
 }
+
+resource "aws_sqs_queue" "app_queue" { 
+  name                      = var.sqs_queue_name 
+  receive_wait_time_seconds = 20
+}
+
 resource "aws_sqs_queue_policy" "s3_to_sqs_policy" {
   queue_url = aws_sqs_queue.app_queue.id
 
@@ -140,14 +143,12 @@ resource "aws_s3_bucket_notification" "bucket_notification" {
   }
 }
 
-# Create the queue
 resource "aws_sqs_queue" "celery_task_queue" {
   name                       = var.celery_queue_name
   visibility_timeout_seconds = 3600
   receive_wait_time_seconds  = 20
 }
 
-# Allow IAM role to access it
 resource "aws_sqs_queue_policy" "celery_queue_policy" {
   queue_url = aws_sqs_queue.celery_task_queue.url
 
@@ -190,13 +191,12 @@ resource "aws_iam_role_policy" "ec2_policy" {
   })
 }
 
-# Attach SSM managed policy so the agent can register and communicate with AWS
+
 resource "aws_iam_role_policy_attachment" "ec2_ssm_policy" {
   role       = aws_iam_role.ec2_role.name
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
-# Output the URL for use in app config
 output "celery_task_queue_url" {
   value = aws_sqs_queue.celery_task_queue.url
 }
@@ -391,7 +391,6 @@ resource "aws_instance" "app_server" {
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   key_name               = "fastapi-ec2-key"
 
-  # 🟢 ENFORCES IMDSv2 Hop limit cross-boundary bridge configurations 
   metadata_options {
     http_endpoint               = "enabled"
     http_tokens                 = "required"
@@ -399,7 +398,8 @@ resource "aws_instance" "app_server" {
   }
 
   user_data = <<EOF
-#!/bin/bash
+
+
 sudo apt-get update -y
 sudo apt-get install docker.io -y
 sudo systemctl start docker

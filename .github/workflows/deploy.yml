@@ -22,7 +22,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # --- STEP A: RUN BACKEND TESTS ---
       - name: Set up Python Environment
         uses: actions/setup-python@v5
         with:
@@ -34,7 +33,6 @@ jobs:
           pip install -r requirements.txt
           # pytest # 👈 Uncomment this when your test suite is ready!
 
-      # --- STEP B: BUILD & PUSH TO DOCKER HUB ---
       - name: Build & Push Backend to DockerHub
         run: |
           docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest ./backend
@@ -68,7 +66,6 @@ jobs:
           TF_VAR_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
           TF_VAR_dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
           TF_VAR_docker_repo: ${{ secrets.DOCKER_REPO }}
-          TF_VAR_ssh_public_key: ${{ secrets.TF_VAR_ssh_public_key }}
           TF_VAR_aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           TF_VAR_aws_secret_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
           TF_VAR_celery_queue_name: ${{ secrets.CELERY_QUEUE_NAME }}
@@ -84,7 +81,6 @@ jobs:
             terraform destroy -auto-approve
           fi
 
-      # --- STEP B: CONFIGURE & BUILD ANGULAR WITH THE ACTIVE IP ---
       - name: Setup Node.js Environment
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         uses: actions/setup-node@v4
@@ -107,7 +103,6 @@ jobs:
           sed -i 's#BACKEND_API_URL_PLACEHOLDER#http://'${{ steps.terraform_step.outputs.fetched_ip }}':8000#g' src/environments/environment.prod.ts
           npm run build -- --configuration=production
 
-      # --- STEP C: PUSH STATIC FRONTEND ASSETS TO S3 ---
       - name: Configure AWS Credentials
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         uses: aws-actions/configure-aws-credentials@v4
@@ -130,7 +125,6 @@ jobs:
           aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html \
             --metadata-directive REPLACE --content-type "text/html" --cache-control "no-cache, no-store, must-revalidate"
 
-      # --- STEP D: PURGE THE CLOUDFRONT CACHE ---
       - name: Invalidate CloudFront Cache
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         run: |
@@ -139,8 +133,6 @@ jobs:
             aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DIST_ID" --paths "/*"
           fi
 
-      # --- STEP E: TELL EC2 WORKER TO RUN THE NEW IMAGE ---
-      # --- STEP E: TELL EC2 WORKER TO RUN THE NEW IMAGE VIA AWS SSM ---
       - name: Refresh Live Docker Containers via AWS Systems Manager
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_instance_id != ''
         run: |
