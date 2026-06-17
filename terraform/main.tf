@@ -53,7 +53,7 @@ provider "aws" {
 # =========================================================================
 resource "aws_s3_bucket" "app_bucket" { 
   bucket        = var.s3_bucket_name 
-  force_destroy = false
+  force_destroy = true
 }
 
 resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
