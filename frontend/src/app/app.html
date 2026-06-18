@@ -1,129 +1,112 @@
-<div class="dashboard-container">
-<div class="dashboard-header">
-  <div>
-    <h1>📸 Image Processing Dashboard</h1>
-    <p>Upload images and track processing status in real time</p>
+<div class="dashboard">
+
+  <!-- HEADER -->
+<div class="header-card">
+
+  <div class="header-left">
+
+    <div class="title-row">
+      <div class="logo-badge">📸</div>
+
+      <div>
+        <h1>File Crop</h1>
+      
+      </div>
+    </div>
+
+   
+
   </div>
 
-  <button
-    class="refresh-btn"
-    (click)="loadImages()">
-    🔄 Refresh
-  </button>
-</div>
+  <div class="header-actions">
 
-<div class="upload-section">
+    <button class="btn ghost" (click)="loadImages()">
+      ↻ Refresh
+    </button>
 
-  <input
-    #fileInput
-    type="file"
-    (change)="onFileSelected($event)"
-  />
-
-  <button
-    class="upload-btn"
-    (click)="onUpload()"
-    [disabled]="!selectedFile || uploading">
-
-    {{ uploading ? 'Uploading...' : 'Upload Image' }}
-
-  </button>
-
-  <span
-    *ngIf="selectedFile"
-    class="selected-file">
-
-    {{ selectedFile.name }}
-
-  </span>
+  </div>
 
 </div>
 
-<div class="toolbar">
+  <!-- UPLOAD CARD -->
+  <div class="card toolbar">
 
-  <input
-    type="text"
-    placeholder="🔍 Search filename..."
-    [(ngModel)]="searchTerm"
-    (input)="applyFilters()">
+  <!-- LEFT: Upload -->
+  <div class="toolbar-left">
 
-  <select
-    [(ngModel)]="statusFilter"
-    (change)="applyFilters()">
+    <input #fileInput type="file" (change)="onFileSelected($event)" />
 
-    <option value="ALL">All Status</option>
-    <option value="pending">Pending</option>
-    <option value="processing">Processing</option>
-    <option value="completed">Completed</option>
-    <option value="failed">Failed</option>
+    <button
+      class="btn primary"
+      (click)="onUpload()"
+      [disabled]="!selectedFile || uploading">
 
-  </select>
+      {{ uploading ? 'Uploading...' : 'Upload Image' }}
+    </button>
 
-</div>
 
-<div *ngIf="loading" class="loading">
-  Loading images...
-</div>
+  </div>
 
-<div class="table-container">
+  <!-- RIGHT: Filters -->
+  <div class="toolbar-right">
 
-  <table class="image-table">
+    <input
+      type="text"
+      placeholder="Search filename..."
+      [(ngModel)]="searchTerm" />
 
-    <thead>
-      <tr>
-        <th (click)="sort('filename')">
-          Filename
-        </th>
+    <select [(ngModel)]="statusFilter">
+      <option value="ALL">All Status</option>
+      <option value="pending">Pending</option>
+      <option value="processing">Processing</option>
+      <option value="completed">Completed</option>
+      <option value="failed">Failed</option>
+    </select>
 
-        <th (click)="sort('status')">
-          Status
-        </th>
+  </div>
 
-        <th (click)="sort('created_at')">
-          Created
-        </th>
 
-        <th>
-          S3 Key
-        </th>
-      </tr>
-    </thead>
+  </div>
 
-    <tbody>
+  <!-- TABLE -->
+  <div class="card table-card">
 
-      <tr *ngIf="filteredImages.length === 0">
-        <td colspan="4" class="empty-state">
-          No images found
-        </td>
-      </tr>
+    <table class="table">
 
-      <tr *ngFor="let image of filteredImages">
+      <thead>
+        <tr>
+          <th (click)="sort('filename')">Filename</th>
+          <th>Status</th>
+          <th (click)="sort('created_at')">Created</th>
+        </tr>
+      </thead>
 
-        <td>{{ image.filename }}</td>
+      <tbody>
 
-        <td>
-          <span
-            class="badge"
-            [ngClass]="getStatusClass(image.status)">
-            {{ image.status }}
-          </span>
-        </td>
+        <tr *ngIf="filteredImages.length === 0">
+          <td colspan="3" class="empty">No images found</td>
+        </tr>
 
-        <td>
-          {{ image.created_at | date:'medium' }}
-        </td>
+        <tr *ngFor="let img of filteredImages; trackBy: trackById">
 
-        <td class="s3-key">
-          {{ image.s3_key }}
-        </td>
+          <td class="filename">{{ img.filename }}</td>
 
-      </tr>
+          <td>
+            <span class="badge" [ngClass]="getStatusClass(img.status)">
+              {{ img.status }}
+            </span>
+          </td>
 
-    </tbody>
+          <td class="date">
+            {{ img.created_at | date:'medium' }}
+          </td>
 
-  </table>
+        </tr>
 
-</div>
+      </tbody>
 
+    </table>
+
+  </div>
 
 </div>
