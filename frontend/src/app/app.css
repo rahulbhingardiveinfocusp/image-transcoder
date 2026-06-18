@@ -1,15 +1,9 @@
 .dashboard-container {
-min-height: 100vh;
+min-height: 96vh;
 background: #eef2f7;
-padding: 30px;
+padding: 2vh;
 }
 
-.dashboard-card {
-background: white;
-border-radius: 20px;
-padding: 24px;
-box-shadow: 0 12px 30px rgba(0,0,0,.08);
-}
 
 .dashboard-header {
 display: flex;
