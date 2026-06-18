@@ -2,7 +2,7 @@
 import datetime
 from uuid import UUID
 
-from backend.app.models.image import ProcessingStatus
+from app.models.image import ProcessingStatus
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.database import get_db
@@ -31,7 +31,7 @@ class ImageResponse(BaseModel):
     model_config = {
         "from_attributes": True
     }
-    
+
 @router.get("/images", response_model=list[ImageResponse],)
 async def get_all_images(db: AsyncSession = Depends(get_db)):
     return await ImageService.get_all_images(db)
