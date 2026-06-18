@@ -1,6 +1,99 @@
-<div style="padding: 20px;">
-  <h2>Upload Image to S3</h2>
+<div class="container">
 
-  <input type="file" (change)="onFileSelected($event)" />
-  <button (click)="onUpload()" [disabled]="!selectedFile">Upload</button>
+  <div class="upload-card">
+    <h2>📸 Image Processing Dashboard</h2>
+
+```
+<div class="upload-row">
+  <input
+    #fileInput
+    type="file"
+    (change)="onFileSelected($event)"
+  />
+
+  <button
+    class="upload-btn"
+    (click)="onUpload()"
+    [disabled]="!selectedFile || uploading">
+    {{ uploading ? 'Uploading...' : 'Upload Image' }}
+  </button>
+</div>
+
+<div *ngIf="selectedFile" class="selected-file">
+  {{ selectedFile.name }}
+</div>
+```
+
+  </div>
+
+  <div class="toolbar">
+
+```
+<input
+  type="text"
+  placeholder="🔍 Search filename..."
+  [(ngModel)]="searchTerm"
+  (input)="applyFilters()">
+
+<select
+  [(ngModel)]="statusFilter"
+  (change)="applyFilters()">
+
+  <option value="ALL">All Status</option>
+  <option value="pending">Pending</option>
+  <option value="processing">Processing</option>
+  <option value="completed">Completed</option>
+  <option value="failed">Failed</option>
+</select>
+
+<button (click)="loadImages()">
+  Refresh
+</button>
+```
+
+  </div>
+
+  <div *ngIf="loading" class="loading">
+    Loading images...
+  </div>
+
+  <table class="image-table">
+
+```
+<thead>
+  <tr>
+    <th (click)="sort('filename')">Filename</th>
+    <th (click)="sort('status')">Status</th>
+    <th (click)="sort('created_at')">Created</th>
+    <th>S3 Key</th>
+  </tr>
+</thead>
+
+<tbody>
+  <tr *ngFor="let image of filteredImages">
+
+    <td>{{ image.filename }}</td>
+
+    <td>
+      <span
+        class="badge"
+        [ngClass]="getStatusClass(image.status)">
+        {{ image.status }}
+      </span>
+    </td>
+
+    <td>
+      {{ image.created_at | date:'medium' }}
+    </td>
+
+    <td>
+      {{ image.s3_key }}
+    </td>
+
+  </tr>
+</tbody>
+```
+
+  </table>
+
 </div>

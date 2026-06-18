@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.models.image import Image
+from app.models.image import Image, ProcessingStatus
 from app.services.s3_service import S3Service
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ class ImageService:
         if not image_record:
             logger.error("Record not found for key: %s", decoded_key)
             return False
-        image_record.status = "COMPLETED"
+        image_record.status = ProcessingStatus.COMPLETED
         try:
             await cls._run_in_executor(
                 s3.delete_object,
@@ -98,3 +98,10 @@ class ImageService:
     async def upload_thumbnail(cls, bucket: str, key: str, data: bytes) -> None:
         s3 = cls._get_s3_client()
         await cls._run_in_executor(s3.put_object, Bucket=bucket, Key=key, Body=data)
+
+    @classmethod
+    async def get_all_images(cls, db: AsyncSession):
+        result = await db.execute(
+            select(Image).order_by(Image.created_at.desc())
+        )
+        return result.scalars().all()
