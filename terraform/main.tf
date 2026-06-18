@@ -231,7 +231,7 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
   }
 
   ordered_cache_behavior {
-    path_pattern     = "/images/*" 
+    path_pattern     = "/api/*" 
     target_origin_id = "EC2-Backend-API"
 
     allowed_methods        = ["GET", "HEAD", "OPTIONS", "PUT", "POST", "PATCH", "DELETE"]

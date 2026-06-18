@@ -71,7 +71,7 @@ export class App implements OnInit, OnDestroy {
   loadImages() {
     this.loading = true;
 
-    this.http.get<ImageItem[]>(`${this.apiBaseUrl}/images`).subscribe({
+    this.http.get<ImageItem[]>(`${this.apiBaseUrl}/api/vi/get-all-images`).subscribe({
       next: (data) => {
         this.images = data;
         this.applyFilters();
@@ -129,7 +129,7 @@ export class App implements OnInit, OnDestroy {
     const file = this.selectedFile;
 
     this.http
-      .post<PreSignedResponse>(`${this.apiBaseUrl}/images/request-upload`, {
+      .post<PreSignedResponse>(`${this.apiBaseUrl}/api/vi/request-upload`, {
         filename: file.name,
         content_type: file.type,
       })

@@ -32,6 +32,6 @@ class ImageResponse(BaseModel):
         "from_attributes": True
     }
 
-@router.get("/images", response_model=list[ImageResponse],)
+@router.get("/get-all-images", response_model=list[ImageResponse],)
 async def get_all_images(db: AsyncSession = Depends(get_db)):
     return await ImageService.get_all_images(db)

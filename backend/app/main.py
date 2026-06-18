@@ -24,4 +24,4 @@ app.add_middleware(
 def health():
     return {"status": "ok"}
 
-app.include_router(v1_router, prefix="/images", tags=["images"])
+app.include_router(v1_router, prefix="/api/v1", tags=["images"])
