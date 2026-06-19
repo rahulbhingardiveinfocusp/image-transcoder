@@ -63,7 +63,7 @@ class ImageService:
     async def process_image(cls, session: AsyncSession, bucket: str, key: str) -> bool:
         decoded_key = unquote(key)
         s3 = cls._get_s3_client()
-
+        new_key = f"processed/{decoded_key.split('/')[-1]}"
         result = await session.execute(
             select(Image).where(Image.s3_key == decoded_key)
         )
@@ -72,6 +72,17 @@ class ImageService:
         if not image_record:
             logger.error("Record not found for key: %s", decoded_key)
             return False
+        try:
+            await cls._run_in_executor(
+                s3.copy_object,
+                Bucket=bucket,
+                CopySource={"Bucket": bucket, "Key": decoded_key},
+                Key=new_key,
+            )
+        except Exception:
+            logger.exception("S3 copy failed for %s", decoded_key)
+            return False
+        image_record.s3_key = new_key
         image_record.status = ProcessingStatus.COMPLETED
         try:
             await cls._run_in_executor(
