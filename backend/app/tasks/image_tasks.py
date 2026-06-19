@@ -69,8 +69,6 @@ async def run_processing_logic(bucket: str, key: str) -> dict:
             image_record = result.scalars().first()
             if not image_record:
                 raise ValueError(f"No image found for key: {decoded_key}")
-
-            image_record.s3_key = decoded_key 
             image_record.s3_processed_file =  thumbnail_key
             session.add(image_record)
             await session.flush()

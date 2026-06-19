@@ -96,7 +96,8 @@ class ImageService:
                 decoded_key,
                 exc_info=True,
             )
-        session.add(image_record)
+        await session.add(image_record)
+        await session.commit()
         return True
     
     @classmethod
