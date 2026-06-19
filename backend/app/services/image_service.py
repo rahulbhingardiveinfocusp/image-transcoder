@@ -104,7 +104,6 @@ class ImageService:
         result = await db.execute(
             select(Image).order_by(Image.created_at.desc())
         )
-        S3_BASE_URL = f"https://{S3}.s3.amazonaws.com"
         images = result.scalars().all()
 
         return [
