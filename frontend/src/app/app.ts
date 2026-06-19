@@ -25,6 +25,7 @@ type ImageItem = {
   status: string;
   s3_key: string;
   created_at: string;
+  url:string;
 };
 
 @Component({
