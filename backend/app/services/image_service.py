@@ -121,16 +121,14 @@ class ImageService:
         images = result.scalars().all()
 
         s3 = S3Service()
-
+        logger.info(f"all imgs:{images}")
         return [
             {
                 "id": str(image.id),
                 "filename": image.filename,
                 "status": image.status.value,
-
-                # always use processed if available, else original
                 "url": s3.generate_presigned_url(
-                    object_name=image.s3_processed_file or image.s3_key,
+                    object_name=image.s3_key,
                     method="get_object"
                 ),
 
