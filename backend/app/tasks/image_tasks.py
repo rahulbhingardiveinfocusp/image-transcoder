@@ -3,7 +3,8 @@ import logging
 import urllib.parse
 from io import BytesIO
 from PIL import Image as PILImage
-
+from sqlalchemy import select
+from app.models.image import Image
 from celery.exceptions import MaxRetriesExceededError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
@@ -62,6 +63,17 @@ async def run_processing_logic(bucket: str, key: str) -> dict:
                 raise RuntimeError(
                     f"Failed to finalise processing for {bucket}/{decoded_key}"
                 )
+            result = await session.execute(
+            select(Image).where(Image.s3_key == decoded_key)
+            )
+            image_record = result.scalars().first()
+            if not image_record:
+                raise ValueError(f"No image found for key: {decoded_key}")
+
+            image_record.s3_key = decoded_key 
+            image_record.s3_processed_file =  thumbnail_key
+            session.add(image_record)
+            await session.flush()
             await session.commit()
 
     finally:
