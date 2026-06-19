@@ -7,7 +7,6 @@ class ImageResponse(BaseModel):
     id: UUID
     filename: str
     status: ProcessingStatus
-    s3_key: str
     created_at: datetime
     url: str
     model_config = {

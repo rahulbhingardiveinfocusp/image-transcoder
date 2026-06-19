@@ -131,7 +131,7 @@ class ImageService:
                     object_name=image.s3_key,
                     method="get_object"
                 ),
-
+                
                 "created_at": image.created_at,
             }
             for image in images
