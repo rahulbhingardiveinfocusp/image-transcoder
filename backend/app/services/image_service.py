@@ -96,6 +96,7 @@ class ImageService:
                 decoded_key,
                 exc_info=True,
             )
+        session.add(image_record)
         return True
     
     @classmethod
