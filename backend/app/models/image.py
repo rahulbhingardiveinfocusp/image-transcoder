@@ -18,4 +18,5 @@ class Image(Base):
     filename = Column(String, nullable=False)
     status = Column(SQLEnum(ProcessingStatus), default=ProcessingStatus.PENDING)
     s3_key = Column(String, nullable=False)
+    s3_processed_file = Column(String)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)

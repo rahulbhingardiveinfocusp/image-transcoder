@@ -56,7 +56,7 @@ async def run_processing_logic(bucket: str, key: str) -> dict:
             thumbnail_data = await asyncio.to_thread(_generate_thumbnail, image_data)
             filename = decoded_key.split("/")[-1]
             thumbnail_key = f"thumbnails/{filename}"
-            await ImageService.upload_thumbnail(bucket, thumbnail_key, thumbnail_data)
+            await ImageService.upload_thumbnail(bucket, thumbnail_key, thumbnail_data,decoded_key,session)
             success = await ImageService.process_image(session, bucket, decoded_key)
             if not success:
                 raise RuntimeError(

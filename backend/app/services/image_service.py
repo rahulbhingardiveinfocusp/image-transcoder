@@ -106,9 +106,15 @@ class ImageService:
         )
 
     @classmethod
-    async def upload_thumbnail(cls, bucket: str, key: str, data: bytes) -> None:
+    async def upload_thumbnail(cls, bucket: str, key: str, data: bytes,decoded_key:str,session: AsyncSession) -> None:
         s3 = cls._get_s3_client()
         await cls._run_in_executor(s3.put_object, Bucket=bucket, Key=key, Body=data)
+        result = await session.execute(
+            select(Image).where(Image.s3_key == decoded_key)
+        )
+        image_record = result.scalars().first()
+        image_record.s3_processed_file = key
+        return True
 
     @classmethod
     async def get_all_images(cls, db: AsyncSession):
@@ -116,6 +122,7 @@ class ImageService:
             select(Image).order_by(Image.created_at.desc())
         )
         images = result.scalars().all()
+        
 
         return [
             {
@@ -123,9 +130,10 @@ class ImageService:
                 "filename": image.filename,
                 "status": image.status.value,
                 "s3_key": image.s3_key,
-                "url":(
+                "url": (
                     f"https://{settings.S3_BUCKET_NAME}.s3."
                     f"{settings.AWS_REGION}.amazonaws.com/{image.s3_key}"
+                    if not image.s3_processed_file else image.s3_processed_file 
                 ),
                 "created_at": image.created_at,
             }
