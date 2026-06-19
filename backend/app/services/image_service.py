@@ -104,4 +104,20 @@ class ImageService:
         result = await db.execute(
             select(Image).order_by(Image.created_at.desc())
         )
-        return result.scalars().all()
+        S3_BASE_URL = f"https://{S3}.s3.amazonaws.com"
+        images = result.scalars().all()
+
+        return [
+            {
+                "id": str(image.id),
+                "filename": image.filename,
+                "status": image.status.value,
+                "s3_key": image.s3_key,
+                "url":(
+                    f"https://{settings.S3_BUCKET_NAME}.s3."
+                    f"{settings.AWS_REGION}.amazonaws.com/{image.s3_key}"
+                ),
+                "created_at": image.created_at,
+            }
+            for image in images
+    ]

@@ -75,6 +75,7 @@
 
       <thead>
         <tr>
+           <th >file</th>
           <th (click)="sort('filename')">Filename</th>
           <th>Status</th>
           <th (click)="sort('created_at')">Created</th>
@@ -82,13 +83,12 @@
       </thead>
 
       <tbody>
-
         <tr *ngIf="filteredImages.length === 0">
           <td colspan="3" class="empty">No images found</td>
         </tr>
 
         <tr *ngFor="let img of filteredImages; trackBy: trackById">
-
+          <td><img src="{img.url}"/> </td>
           <td class="filename">{{ img.filename }}</td>
 
           <td>
