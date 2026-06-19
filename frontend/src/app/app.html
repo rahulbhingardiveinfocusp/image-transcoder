@@ -88,7 +88,7 @@
         </tr>
 
         <tr *ngFor="let img of filteredImages; trackBy: trackById">
-          <td><img src="{img.url}"/> </td>
+          <td><img src="{{img.url}}"/> </td>
           <td class="filename">{{ img.filename }}</td>
 
           <td>

@@ -119,4 +119,4 @@ class ImageService:
                 "created_at": image.created_at,
             }
             for image in images
-    ]
+        ]
