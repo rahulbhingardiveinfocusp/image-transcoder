@@ -289,7 +289,11 @@
   color: #6b7280;
   font-size: 13px;
 }
-
+.processe-file{
+  width: 28px;
+  height: 28px;
+  margin: auto;
+}
 /* =========================
    BADGES (modern pills)
 ========================= */

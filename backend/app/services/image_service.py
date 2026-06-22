@@ -82,8 +82,6 @@ class ImageService:
         except Exception:
             logger.exception("S3 copy failed for %s", decoded_key)
             return False
-        image_record.s3_key = new_key
-        image_record.status = ProcessingStatus.COMPLETED
         try:
             await cls._run_in_executor(
                 s3.delete_object,

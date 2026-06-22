@@ -4,7 +4,7 @@ import urllib.parse
 from io import BytesIO
 from PIL import Image as PILImage
 from sqlalchemy import select
-from app.models.image import Image
+from app.models.image import Image, ProcessingStatus
 from celery.exceptions import MaxRetriesExceededError
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
@@ -60,6 +60,10 @@ async def run_processing_logic(bucket: str, key: str) -> dict:
                 raise ValueError(f"No image found for key: {decoded_key}")
             
             image_data = await ImageService.download_image(bucket, decoded_key)
+            if not image_data:
+                raise RuntimeError(
+                    f"key not found {bucket}/{decoded_key}"
+                )
             thumbnail_data = await asyncio.to_thread(_generate_thumbnail, image_data)
             filename = decoded_key.split("/")[-1]
             thumbnail_key = f"thumbnails/{filename}"
@@ -69,12 +73,16 @@ async def run_processing_logic(bucket: str, key: str) -> dict:
                 raise RuntimeError(
                     f"Failed to finalise processing for {bucket}/{decoded_key}"
                 )
+            
             result = await session.execute(
             select(Image).where(Image.s3_key == decoded_key)
             )
             image_record = result.scalars().first()
             if not image_record:
                 raise ValueError(f"No image found for key: {decoded_key}")
+            new_key = f"processed/{decoded_key.split('/')[-1]}"
+            image_record.s3_key = new_key
+            image_record.status = ProcessingStatus.COMPLETED
             image_record.s3_processed_file =  thumbnail_key
             session.add(image_record)
             await session.flush()
