@@ -126,7 +126,7 @@ class ImageService:
                 "filename": image.filename,
                 "status": image.status.value,
                 "url": s3.generate_presigned_url(
-                    object_name=image.s3_key,
+                    object_name=image.s3_processed_file or image.s3_key, 
                     method="get_object"
                 ),
 
