@@ -96,8 +96,6 @@ class ImageService:
                 decoded_key,
                 exc_info=True,
             )
-        await session.add(image_record)
-        await session.commit()
         return True
     
     @classmethod
@@ -131,7 +129,7 @@ class ImageService:
                     object_name=image.s3_key,
                     method="get_object"
                 ),
-                
+
                 "created_at": image.created_at,
             }
             for image in images

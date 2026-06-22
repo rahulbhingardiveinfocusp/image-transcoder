@@ -40,7 +40,6 @@ def process_s3_upload_task(self, bucket: str, key: str):
 
 async def run_processing_logic(bucket: str, key: str) -> dict:
     decoded_key = urllib.parse.unquote(key)
-
     thumbnail_key: str | None = None
     engine = create_async_engine(
         settings.DATABASE_URL,
@@ -53,6 +52,13 @@ async def run_processing_logic(bucket: str, key: str) -> dict:
             if await ImageService.already_processed(session, bucket, decoded_key):
                 logger.info("[-] Already completed, skipping: %s", decoded_key)
                 return {"status": "already_processed"}
+            result = await session.execute(
+                select(Image).where(Image.s3_key == decoded_key)
+            )
+            image_record = result.scalars().first()
+            if not image_record:
+                raise ValueError(f"No image found for key: {decoded_key}")
+            
             image_data = await ImageService.download_image(bucket, decoded_key)
             thumbnail_data = await asyncio.to_thread(_generate_thumbnail, image_data)
             filename = decoded_key.split("/")[-1]
