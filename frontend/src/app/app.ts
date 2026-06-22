@@ -209,7 +209,7 @@ export class App implements OnInit, OnDestroy {
   }
 
   async shareProcessed(img: any): Promise<void> {
-    await this.shareUrl(`${img.filename} (Processed)`, img.processed_s3_key);
+    await this.shareUrl(`${img.filename} (Processed)`, img.urls);
   }
 
   private async shareUrl(title: string, url: string): Promise<void> {
