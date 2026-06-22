@@ -54,57 +54,50 @@ class ImageService:
         result = await session.execute(
             select(Image).where(
                 Image.s3_key == key,
-                Image.status == "COMPLETED",
+                Image.status == ProcessingStatus.COMPLETED,
             )
         )
         return result.scalar_one_or_none() is not None
 
     @classmethod  
-    async def process_image(cls, session: AsyncSession, bucket: str, key: str) -> bool:
-        decoded_key = unquote(key)
-        s3 = cls._get_s3_client()
-        new_key = f"processed/{decoded_key.split('/')[-1]}"
-        result = await session.execute(
-            select(Image).where(Image.s3_key == decoded_key)
-        )
-        image_record = result.scalars().first()
+    async def process_image(cls, session: AsyncSession, bucket: str, key: str) -> str:
 
+        s3 = cls._get_s3_client()
+        new_key = f"processed/{key.split('/')[-1]}"
+
+        result = await session.execute(select(Image).where(Image.s3_key == key))
+        image_record = result.scalars().first()
         if not image_record:
-            logger.error("Record not found for key: %s", decoded_key)
-            return False
+            logger.error("Record not found for key: %s", key)
+            raise ValueError(f"Record not found for key: {key}")
+
         try:
             await cls._run_in_executor(
                 s3.copy_object,
                 Bucket=bucket,
-                CopySource={"Bucket": bucket, "Key": decoded_key},
+                CopySource={"Bucket": bucket, "Key": key},
                 Key=new_key,
             )
         except Exception:
-            logger.exception("S3 copy failed for %s", decoded_key)
-            return False
+            logger.exception("S3 copy failed for %s", key)
+            raise  # let the caller handle status transitions
+
         try:
-            await cls._run_in_executor(
-                s3.delete_object,
-                Bucket=bucket,
-                Key=decoded_key,
-            )
+            await cls._run_in_executor(s3.delete_object, Bucket=bucket, Key=key)
         except Exception:
-            logger.warning(
-                "Failed to delete original object %s (non-fatal)",
-                decoded_key,
-                exc_info=True,
-            )
-        return True
+            logger.warning("Failed to delete original %s (non-fatal)", key, exc_info=True)
+
+        return new_key
     
     @classmethod
     async def download_image(cls, bucket: str, key: str) -> bytes:
         s3 = cls._get_s3_client()
-        return await cls._run_in_executor(
-            lambda: s3.get_object(Bucket=bucket, Key=key)["Body"].read()
-        )
+        def _get_and_read():
+            return s3.get_object(Bucket=bucket, Key=key)["Body"].read()
+        return await cls._run_in_executor(_get_and_read)
 
     @classmethod
-    async def upload_thumbnail(cls, bucket: str, key: str, data: bytes,decoded_key:str,session: AsyncSession) -> None:
+    async def upload_thumbnail(cls, bucket: str, key: str, data: bytes) -> None:
         s3 = cls._get_s3_client()
         await cls._run_in_executor(s3.put_object, Bucket=bucket, Key=key, Body=data)
         
@@ -117,7 +110,7 @@ class ImageService:
         images = result.scalars().all()
 
         s3 = S3Service()
-        logger.info(f"all imgs:{images}")
+        logger.info("all imgs: %s", images)
         return [
             {
                 "id": str(image.id),
