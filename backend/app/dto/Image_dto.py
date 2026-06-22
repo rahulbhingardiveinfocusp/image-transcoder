@@ -9,7 +9,7 @@ class ImageResponse(BaseModel):
     status: ProcessingStatus
     created_at: datetime
     url: str
-    s3_Key:str
+    s3_key:str
     model_config = {
         "from_attributes": True
     }
