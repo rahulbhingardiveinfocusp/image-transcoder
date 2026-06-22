@@ -46,8 +46,6 @@
 
 
   </div>
-
-  <!-- RIGHT: Filters -->
   <div class="toolbar-right">
 
     <input
@@ -88,7 +86,7 @@
         </tr>
 
         <tr *ngFor="let img of filteredImages; trackBy: trackById">
-          <td><img src="{{img?.url}}" alt="{{ img.filename }}"/> </td>
+          <td><img class="processe-file" src="{{img?.url}}" alt="{{ img.filename }}"/> </td>
           <td class="filename">{{ img.filename }}</td>
 
           <td>
