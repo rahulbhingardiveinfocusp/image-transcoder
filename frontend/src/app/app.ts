@@ -5,7 +5,7 @@ import {
   OnInit,
   ViewChild,
   ChangeDetectionStrategy,
-  ChangeDetectorRef
+  ChangeDetectorRef,
 } from '@angular/core';
 
 import { CommonModule } from '@angular/common';
@@ -25,7 +25,7 @@ type ImageItem = {
   status: string;
   s3_key: string;
   created_at: string;
-  url:string;
+  url: string;
 };
 
 @Component({
@@ -33,7 +33,7 @@ type ImageItem = {
   templateUrl: './app.html',
   styleUrl: './app.css',
   imports: [CommonModule, FormsModule, HttpClientModule],
-  changeDetection: ChangeDetectionStrategy.OnPush
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class App implements OnInit, OnDestroy {
   @ViewChild('fileInput') fileInput!: ElementRef;
@@ -56,7 +56,7 @@ export class App implements OnInit, OnDestroy {
 
   constructor(
     private http: HttpClient,
-    private cdr: ChangeDetectorRef
+    private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {
@@ -82,21 +82,20 @@ export class App implements OnInit, OnDestroy {
     this.loading = true;
     this.cdr.markForCheck();
 
-    this.http.get<ImageItem[]>(`${this.apiBaseUrl}/api/v1/get-all-images`)
-      .subscribe({
-        next: (data) => {
-          this.images = data;
+    this.http.get<ImageItem[]>(`${this.apiBaseUrl}/api/v1/get-all-images`).subscribe({
+      next: (data) => {
+        this.images = data;
 
-          this.loading = false;
+        this.loading = false;
 
-          // 🔥 critical for OnPush reliability
-          this.cdr.markForCheck();
-        },
-        error: () => {
-          this.loading = false;
-          this.cdr.markForCheck();
-        }
-      });
+        // 🔥 critical for OnPush reliability
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.loading = false;
+        this.cdr.markForCheck();
+      },
+    });
   }
 
   // ✅ computed UI data (no extra state)
@@ -105,13 +104,11 @@ export class App implements OnInit, OnDestroy {
 
     if (this.searchTerm) {
       const term = this.searchTerm.toLowerCase();
-      data = data.filter(x =>
-        x.filename.toLowerCase().includes(term)
-      );
+      data = data.filter((x) => x.filename.toLowerCase().includes(term));
     }
 
     if (this.statusFilter !== 'ALL') {
-      data = data.filter(x => x.status === this.statusFilter);
+      data = data.filter((x) => x.status === this.statusFilter);
     }
 
     return this.sortData(data);
@@ -134,8 +131,7 @@ export class App implements OnInit, OnDestroy {
 
   sort(column: keyof ImageItem) {
     if (this.sortColumn === column) {
-      this.sortDirection =
-        this.sortDirection === 'asc' ? 'desc' : 'asc';
+      this.sortDirection = this.sortDirection === 'asc' ? 'desc' : 'asc';
     } else {
       this.sortColumn = column;
       this.sortDirection = 'asc';
@@ -152,43 +148,42 @@ export class App implements OnInit, OnDestroy {
 
     const file = this.selectedFile;
 
-    this.http.post<PreSignedResponse>(
-      `${this.apiBaseUrl}/api/v1/request-upload`,
-      {
+    this.http
+      .post<PreSignedResponse>(`${this.apiBaseUrl}/api/v1/request-upload`, {
         filename: file.name,
         content_type: file.type,
-      }
-    ).subscribe({
-      next: (res) => {
-        fetch(res.upload_url, {
-          method: 'PUT',
-          headers: { 'Content-Type': file.type },
-          body: file,
-        })
-          .then((response) => {
-            if (!response.ok) throw new Error();
-
-            this.selectedFile = null;
-            if (this.fileInput) {
-              this.fileInput.nativeElement.value = '';
-            }
-
-            this.uploading = false;
-
-            // 🔥 refresh UI
-            this.loadImages();
+      })
+      .subscribe({
+        next: (res) => {
+          fetch(res.upload_url, {
+            method: 'PUT',
+            headers: { 'Content-Type': file.type },
+            body: file,
           })
-          .catch(() => {
-            this.uploading = false;
-            this.cdr.markForCheck();
-            alert('Upload failed');
-          });
-      },
-      error: () => {
-        this.uploading = false;
-        this.cdr.markForCheck();
-      }
-    });
+            .then((response) => {
+              if (!response.ok) throw new Error();
+
+              this.selectedFile = null;
+              if (this.fileInput) {
+                this.fileInput.nativeElement.value = '';
+              }
+
+              this.uploading = false;
+
+              // 🔥 refresh UI
+              this.loadImages();
+            })
+            .catch(() => {
+              this.uploading = false;
+              this.cdr.markForCheck();
+              alert('Upload failed');
+            });
+        },
+        error: () => {
+          this.uploading = false;
+          this.cdr.markForCheck();
+        },
+      });
   }
 
   getStatusClass(status: string) {
@@ -206,5 +201,29 @@ export class App implements OnInit, OnDestroy {
 
   trackById(index: number, item: ImageItem) {
     return item.id;
+  }
+
+  async shareOriginal(img: any): Promise<void> {
+    await this.shareUrl(img.filename, img.s3_key);
+  }
+
+  async shareProcessed(img: any): Promise<void> {
+    await this.shareUrl(`${img.filename} (Processed)`, img.processed_s3_key);
+  }
+
+  private async shareUrl(title: string, url: string): Promise<void> {
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title,
+          url,
+        });
+      } else {
+        await navigator.clipboard.writeText(url);
+        alert('Link copied to clipboard');
+      }
+    } catch (err) {
+      console.error(err);
+    }
   }
 }
