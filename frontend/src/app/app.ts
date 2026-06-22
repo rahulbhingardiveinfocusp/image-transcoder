@@ -204,27 +204,41 @@ export class App implements OnInit, OnDestroy {
     return item.id;
   }
 
-  async shareOriginal(img: any): Promise<void> {
+  async shareOriginal(img: any): Promise<void> {debugger
     await this.shareUrl(img.filename, img.s3_key);
   }
 
-  async shareProcessed(img: any): Promise<void> {
+  async shareProcessed(img: any): Promise<void> {debugger
     await this.shareUrl(`${img.filename} (Processed)`, img.url);
   }
-
   private async shareUrl(title: string, url: string): Promise<void> {
+    if (!url) {
+      alert('URL not available');
+      return;
+    }
     try {
       if (navigator.share) {
-        await navigator.share({
-          title,
-          url,
-        });
+        await navigator.share({ title, url });
       } else {
-        await navigator.clipboard.writeText(url);
-        alert('Link copied to clipboard');
+        await this.copyToClipboard(url);
       }
     } catch (err) {
       console.error(err);
     }
   }
+
+  private copyToClipboard(url: string): void {
+    // fallback that works even when document is not focused
+    const el = document.createElement('textarea');
+    el.value = url;
+    el.style.position = 'fixed';
+    el.style.opacity = '0';
+    document.body.appendChild(el);
+    el.focus();
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    alert('Link copied to clipboard');
+  }
+
 }
