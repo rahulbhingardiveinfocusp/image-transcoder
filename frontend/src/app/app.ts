@@ -24,6 +24,7 @@ type ImageItem = {
   filename: string;
   status: string;
   s3_key: string;
+  processed_s3_key:string;
   created_at: string;
   url: string;
 };
