@@ -58,7 +58,7 @@ resource "aws_s3_bucket" "app_bucket" {
 
 resource "aws_s3_bucket_cors_configuration" "app_bucket_cors" {
   bucket = aws_s3_bucket.app_bucket.id
-  
+  depends_on = [aws_s3_bucket.app_bucket]
   cors_rule {
     allowed_origins = ["*"]
     allowed_methods = ["GET", "PUT", "POST", "HEAD"]
