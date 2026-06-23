@@ -20,102 +20,102 @@
 
 
 
-  
-    </div>
 
   </div>
 
-  <!-- UPLOAD CARD -->
-  <div class="card toolbar">
+</div>
 
-    <!-- LEFT: Upload -->
-    <div class="toolbar-left">
+<!-- UPLOAD CARD -->
+<div class="card toolbar">
 
-      <input #fileInput type="file" (change)="onFileSelected($event)" />
+  <!-- LEFT: Upload -->
+  <div class="toolbar-left">
 
-      <button class="btn primary" (click)="onUpload()" [disabled]="!selectedFile || uploading">
+    <input #fileInput type="file" (change)="onFileSelected($event)" />
 
-        {{ uploading ? 'Uploading...' : 'Upload Image' }}
-      </button>
+    <button class="btn primary" (click)="onUpload()" [disabled]="!selectedFile || uploading">
 
-
-    </div>
-    <div class="toolbar-right">
-
-      <input type="text" placeholder="Search filename..." [(ngModel)]="searchTerm" />
-
-      <select [(ngModel)]="statusFilter">
-        <option value="ALL">All Status</option>
-        <option value="pending">Pending</option>
-        <option value="processing">Processing</option>
-        <option value="completed">Completed</option>
-        <option value="failed">Failed</option>
-      </select>
-
-    </div>
+      {{ uploading ? 'Uploading...' : 'Upload Image' }}
+    </button>
 
 
   </div>
+  <div class="toolbar-right">
 
-  <!-- TABLE -->
-  <div class="card table-card">    <div class="header-actions">
+    <input type="text" placeholder="Search filename..." [(ngModel)]="searchTerm" />
+
+    <select [(ngModel)]="statusFilter">
+      <option value="ALL">All Status</option>
+      <option value="pending">Pending</option>
+      <option value="processing">Processing</option>
+      <option value="completed">Completed</option>
+      <option value="failed">Failed</option>
+    </select>
+
+  </div>
+
+
+</div>
+
+<!-- TABLE -->
+<div class="card table-card">
+  <div class="header-actions">
     <button class="btn ghost" (click)="loadImages()">
-        ↻ Refresh
-      </button></div>
+      ↻ Refresh
+    </button>
+  </div>
 
-    <table class="table">
+  <table class="table">
 
-      <thead>
-        <tr>
-          <th>file</th>
-          <th (click)="sort('filename')">Filename</th>
-          <th>Status</th>
-          <th (click)="sort('created_at')">Created</th>
-          <th>Action</th>
-        </tr>
-      </thead>
+    <thead>
+      <tr>
+        <th>file</th>
+        <th (click)="sort('filename')">Filename</th>
+        <th>Status</th>
+        <th (click)="sort('created_at')">Created</th>
+        <th>Action</th>
+      </tr>
+    </thead>
 
-      <tbody>
-        <tr *ngIf="filteredImages.length === 0">
-          <td colspan="5" class="empty">No images found</td>
-        </tr>
+    <tbody>
+      <tr *ngIf="filteredImages.length === 0">
+        <td colspan="5" class="empty">No images found</td>
+      </tr>
 
-        <tr *ngFor="let img of filteredImages; trackBy: trackById">
-          <td><img class="processe-file" src="{{img?.url}}" alt="{{ img.filename }}" /> </td>
-          <td class="filename">{{ img.filename }}</td>
+      <tr *ngFor="let img of filteredImages; trackBy: trackById">
+        <td><img class="processe-file" src="{{img?.url}}" alt="{{ img.filename }}" /> </td>
+        <td class="filename">{{ img.filename }}</td>
 
-          <td>
-            <span class="badge" [ngClass]="getStatusClass(img.status)">
-              {{ img.status }}
-            </span>
-          </td>
+        <td>
+          <span class="badge" [ngClass]="getStatusClass(img.status)">
+            {{ img.status }}
+          </span>
+        </td>
 
-          <td class="date">
-            {{ img.created_at | date:'medium' }}
-          </td>
-          <td class="actions">
-            <div class="action-menu">
-              <button class="btn ghost">
-                Share ▼
+        <td class="date">
+          {{ img.created_at | date:'medium' }}
+        </td>
+        <td class="actions">
+          <div class="action-menu">
+            <button class="btn ghost">
+              Share ▼
+            </button>
+
+            <div class="dropdown">
+              <button (click)="shareOriginal(img)">
+                Share Original
               </button>
 
-              <div class="dropdown">
-                <button (click)="shareOriginal(img)">
-                  Share Original
-                </button>
-
-                <button (click)="shareProcessed(img)">
-                  Share Processed
-                </button>
-              </div>
+              <button (click)="shareProcessed(img)">
+                Share Processed
+              </button>
             </div>
-          </td>
-        </tr>
+          </div>
+        </td>
+      </tr>
 
-      </tbody>
+    </tbody>
 
-    </table>
-
-  </div>
+  </table>
 
 </div>
