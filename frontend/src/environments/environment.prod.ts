@@ -1,5 +1,6 @@
 export const environment = {
   production: true,
-  // After (Tells the browser to talk directly to CloudFront)
-  apiUrl: ''
+  apiUrl: '',
+  cognitoUserPoolId: 'COGNITO_USER_POOL_ID_PLACEHOLDER',
+  cognitoClientId: 'COGNITO_CLIENT_ID_PLACEHOLDER'
 };
