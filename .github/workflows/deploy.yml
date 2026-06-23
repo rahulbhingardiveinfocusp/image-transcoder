@@ -100,6 +100,8 @@ jobs:
       - name: Compile Frontend Production Bundle
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         working-directory: ./frontend
+        env:
+          AWS_REGION: ${{ secrets.AWS_REGION }} 
         run: |
           npm ci
           COGNITO_POOL_ID=$(cd ../terraform && terraform output -raw user_pool_id)
