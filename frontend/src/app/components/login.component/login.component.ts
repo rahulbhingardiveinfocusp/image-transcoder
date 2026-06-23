@@ -25,7 +25,7 @@ export class LoginComponent {
 
   constructor(
     private auth: AuthService,
-    private router: Router
+    private router: Router,
   ) {}
 
   async login() {
@@ -38,15 +38,10 @@ export class LoginComponent {
 
       const isAdmin = await this.auth.isAdmin();
       this.router.navigate([isAdmin ? '/admin' : '/user']);
-
     } catch (err: any) {
       if (err?.name === 'UserNotConfirmedException') {
-        try {
-          await resendSignUpCode({ username: this.email });
-        } catch {}
-
         this.showConfirmation = true;
-        this.success = 'Please verify your account. A new code has been sent.';
+        this.success = 'Please verify your account first';
       } else {
         this.error = err?.message || 'Login failed';
       }
@@ -60,16 +55,15 @@ export class LoginComponent {
     this.success = '';
     this.loading = true;
 
+    // 🔥 ALWAYS switch UI first
+    this.showConfirmation = true;
+
     try {
-      const result = await this.auth.signUp(this.email, this.password);
-      console.log(result);
-
-      this.showConfirmation = true;
+      await this.auth.signUp(this.email, this.password);
       this.success = 'Verification code sent to email';
-
     } catch (err: any) {
+      this.showConfirmation = false;
       this.error = err?.message || 'Signup failed';
-
     } finally {
       this.loading = false;
     }
@@ -87,10 +81,8 @@ export class LoginComponent {
 
       const isAdmin = await this.auth.isAdmin();
       this.router.navigate([isAdmin ? '/admin' : '/user']);
-
     } catch (err: any) {
       this.error = err?.message || 'Verification failed';
-
     } finally {
       this.loading = false;
     }
