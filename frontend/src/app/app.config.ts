@@ -28,7 +28,7 @@ export const awsConfig = {
   Auth: {
 
     Cognito: {
-
+      region:environment.AWS_REGION,
       userPoolId:
         environment.cognitoUserPoolId,
 
