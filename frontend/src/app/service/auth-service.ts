@@ -40,7 +40,7 @@ export class AuthService {
   }
 
   async logout() {
-    signOut();
+   await signOut();
     window.location.reload()
     return true
   }

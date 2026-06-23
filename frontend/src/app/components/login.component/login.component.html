@@ -1,63 +1,31 @@
 <div class="auth-container">
-
   <div class="auth-card">
 
     <h2>AWS Cognito Authentication</h2>
 
-    <div
-      *ngIf="error"
-      class="error">
-      {{ error }}
-    </div>
+    <div *ngIf="error" class="error">{{ error }}</div>
+    <div *ngIf="success" class="success">{{ success }}</div>
 
-    <div
-      *ngIf="success"
-      class="success">
-      {{ success }}
-    </div>
+    <ng-container *ngIf="!showConfirmation">
+      <input type="email" placeholder="Email" [(ngModel)]="email">
+      <input type="password" placeholder="Password" [(ngModel)]="password">
 
-    <input
-      type="email"
-      placeholder="Email"
-      [(ngModel)]="email">
+      <div class="buttons">
+        <button (click)="login()" [disabled]="loading">Login</button>
+        <button (click)="signup()" [disabled]="loading">Sign Up</button>
+      </div>
+    </ng-container>
 
-    <input
-      type="password"
-      placeholder="Password"
-      [(ngModel)]="password">
+    <ng-container *ngIf="showConfirmation">
+      <p class="hint">Enter the code sent to <strong>{{ email }}</strong></p>
 
-    <div class="buttons">
+      <input placeholder="Verification Code" [(ngModel)]="verificationCode">
 
-      <button
-        (click)="login()"
-        [disabled]="loading">
-
-        Login
-      </button>
-
-      <button
-        (click)="signup()"
-        [disabled]="loading">
-
-        Sign Up
-      </button>
-
-    </div>
-
-    <div *ngIf="showConfirmation">
-
-      <input
-        placeholder="Verification Code"
-        [(ngModel)]="verificationCode">
-
-      <button
-        (click)="confirmSignup()">
-
-        Verify Account
-      </button>
-
-    </div>
+      <div class="buttons">
+        <button (click)="confirmSignup()" [disabled]="loading">Verify Account</button>
+        <button (click)="resendCode()" [disabled]="loading" class="secondary">Resend Code</button>
+      </div>
+    </ng-container>
 
   </div>
-
 </div>
