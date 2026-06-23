@@ -5,44 +5,43 @@ import {
   signOut,
   confirmSignUp,
   getCurrentUser,
-  fetchAuthSession
+  fetchAuthSession,
 } from 'aws-amplify/auth';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AuthService {
-
   async signUp(email: string, password: string) {
     return signUp({
       username: email,
       password,
       options: {
         userAttributes: {
-          email
-        }
-      }
+          email,
+        },
+      },
     });
   }
 
   async confirm(email: string, code: string) {
     return confirmSignUp({
       username: email,
-      confirmationCode: code
+      confirmationCode: code,
     });
   }
 
   async login(email: string, password: string) {
     return signIn({
       username: email,
-      password
+      password,
     });
   }
 
   async logout() {
-   await signOut();
-    window.location.reload()
-    return true
+    await signOut();
+    window.location.reload();
+    return true;
   }
 
   async currentUser() {
@@ -50,24 +49,15 @@ export class AuthService {
   }
 
   async getGroups(): Promise<string[]> {
-
     const session = await fetchAuthSession();
 
-    const groupsClaim =
-      session.tokens?.idToken?.payload?.[
-        'cognito:groups'
-      ];
+    const groupsClaim = session.tokens?.idToken?.payload?.['cognito:groups'];
 
     if (Array.isArray(groupsClaim)) {
-
-      return groupsClaim.filter(
-        (item): item is string =>
-          typeof item === 'string'
-      );
+      return groupsClaim.filter((item): item is string => typeof item === 'string');
     }
 
     if (typeof groupsClaim === 'string') {
-
       return [groupsClaim];
     }
 
@@ -75,9 +65,13 @@ export class AuthService {
   }
 
   async isAdmin(): Promise<boolean> {
-
     const groups = await this.getGroups();
 
     return groups.includes('Admin');
+  }
+
+  async getJwt() {
+    const session = await fetchAuthSession();
+    return session.tokens?.accessToken?.toString();
   }
 }
