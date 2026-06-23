@@ -1,3 +1,5 @@
+from typing import Optional
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -13,8 +15,8 @@ class Settings(BaseSettings):
     ADMIN_EMAIL:str
     CELERY_QUEUE_NAME: str = "celery-task-queue" 
     CELERY_TASK_QUEUE_URL: str  
-    USER_POOL_CLIENT_ID:str
-    USER_POOL_ID:str
+    USER_POOL_CLIENT_ID: Optional[str] = None   # ← was required
+    USER_POOL_ID: Optional[str] = None    
     
     class Config:
         env_file = ".env"
