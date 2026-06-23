@@ -37,9 +37,14 @@ jobs:
       # --- STEP B: BUILD & PUSH TO DOCKER HUB ---
       - name: Build & Push Backend to DockerHub
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest ./backend
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest
+          echo "Username length: ${#DOCKERHUB_USERNAME}"
+          echo "Repo length: ${#DOCKER_REPO}"
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest" ./backend
+          docker push "${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest"
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKER_REPO: ${{ secrets.DOCKER_REPO }}
 
   # =========================================================================
   # 2. MANUAL WORKFLOW DISPATCH: Complete Infrastructure & App Deployment
