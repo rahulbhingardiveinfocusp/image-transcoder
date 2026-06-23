@@ -19,6 +19,8 @@ class S3Service:
             params = {
                 "Bucket": settings.S3_BUCKET_NAME,
                 "Key": object_name,
+                "ResponseContentType": "image/jpeg",
+                "ResponseContentDisposition": "inline",
             }
 
             if method == "put_object" and content_type:

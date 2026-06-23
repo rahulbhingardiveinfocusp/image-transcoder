@@ -18,7 +18,7 @@ jobs:
   build-and-test:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    environment: dev 
+    environment: dev option 
     steps:
       - uses: actions/checkout@v4
 
@@ -69,6 +69,8 @@ jobs:
           TF_VAR_dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
           TF_VAR_docker_repo: ${{ secrets.DOCKER_REPO }}
           TF_VAR_celery_queue_name: ${{ secrets.CELERY_QUEUE_NAME }}
+          TF_VAR_admin_email: ${{ secrets.ADMIN_EMAIL }}
+          TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
         run: |
           terraform init
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
@@ -100,8 +102,18 @@ jobs:
         working-directory: ./frontend
         run: |
           npm ci
-          echo "Injecting Backend Endpoint URL (http://${{ steps.terraform_step.outputs.fetched_ip }}:8000) into Angular production config..."
-          sed -i 's#BACKEND_API_URL_PLACEHOLDER#http://'${{ steps.terraform_step.outputs.fetched_ip }}':8000#g' src/environments/environment.prod.ts
+          COGNITO_POOL_ID=$(cd ../terraform && terraform output -raw user_pool_id)
+          COGNITO_CLIENT_ID=$(cd ../terraform && terraform output -raw user_pool_client_id)
+          BACKEND_IP="${{ steps.terraform_step.outputs.fetched_ip }}"
+          
+          echo "Injecting variables into Angular production config..."
+          
+          # 2. Replace placeholders in the environment file using sed
+          sed -i "s#BACKEND_API_URL_PLACEHOLDER#http://${BACKEND_IP}:8000#g" src/environments/environment.prod.ts
+          sed -i "s#COGNITO_USER_POOL_ID_PLACEHOLDER#${COGNITO_POOL_ID}#g" src/environments/environment.prod.ts
+          sed -i "s#COGNITO_CLIENT_ID_PLACEHOLDER#${COGNITO_CLIENT_ID}#g" src/environments/environment.prod.ts
+          sed -i "s#COGNITO_REGION_PLACEHOLDER#${AWS_REGION}#g" src/environments/environment.prod.ts 
+          # 3. Build the static production assets
           npm run build -- --configuration=production
 
       # --- STEP C: PUSH STATIC FRONTEND ASSETS TO S3 ---

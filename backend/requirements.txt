@@ -87,3 +87,4 @@ wcwidth==0.7.0
 websockets==16.0
 gevent
 pycurl
+jose

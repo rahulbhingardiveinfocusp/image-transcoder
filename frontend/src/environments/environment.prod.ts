@@ -3,5 +3,5 @@ export const environment = {
   apiUrl: '',
   cognitoUserPoolId: 'COGNITO_USER_POOL_ID_PLACEHOLDER',
   cognitoClientId: 'COGNITO_CLIENT_ID_PLACEHOLDER',
-  AWS_REGION:'us-west-1'
+  cognitoRegion:'COGNITO_REGION_PLACEHOLDER'
 };

@@ -43,6 +43,14 @@ variable "celery_queue_name" {
   description = "Name of the Celery task queue"
   type        = string
 }
+variable "admin_email" {
+  type = string
+}
+
+variable "admin_password" {
+  type      = string
+  sensitive = true
+}
 
 provider "aws" {
   region = var.aws_region
@@ -308,7 +316,99 @@ resource "aws_s3_bucket_policy" "allow_cloudfront" {
     ]
   })
 }
+# =========================================================================
+# cognito
+# =========================================================================
+resource "aws_cognito_user_pool" "main" {
+  name = "app-user-pool"
 
+  # Enable email as the sign-in attribute
+  username_attributes      = ["email"]
+  auto_verified_attributes = ["email"]
+
+  password_policy {
+    minimum_length    = 8
+    require_lowercase = true
+    require_numbers   = true
+    require_symbols   = true
+    require_uppercase = true
+  }
+
+  schema {
+    attribute_data_type      = "String"
+    developer_only_attribute = false
+    mutable                  = true
+    name                     = "email"
+    required                 = true
+
+    string_attribute_constraints {
+      min_length = 7
+      max_length = 256
+    }
+  }
+}
+
+# 2. Cognito User Pool Client (For Angular Frontend)
+resource "aws_cognito_user_pool_client" "client" {
+  name         = "angular-app-client"
+  user_pool_id = aws_cognito_user_pool.main.id
+
+  explicit_auth_flows = [
+      "ALLOW_USER_SRP_AUTH",
+      "ALLOW_USER_PASSWORD_AUTH",
+      "ALLOW_REFRESH_TOKEN_AUTH"
+    ]
+  prevent_user_existence_errors = "ENABLED"
+  generate_secret = false 
+}
+
+# 3. User Groups (Admin vs Simple User)
+resource "aws_cognito_user_group" "admin_group" {
+  name         = "Admin"
+  user_pool_id = aws_cognito_user_pool.main.id
+  description  = "Administrative users with full access"
+}
+
+resource "aws_cognito_user_group" "user_group" {
+  name         = "User"
+  user_pool_id = aws_cognito_user_pool.main.id
+  description  = "Standard application users"
+}
+resource "aws_cognito_user" "admin" {
+  user_pool_id = aws_cognito_user_pool.main.id
+  username     = var.admin_email
+
+  attributes = {
+    email          = var.admin_email
+    email_verified = "true"
+  }
+}
+resource "aws_cognito_user_in_group" "admin_membership" {
+  user_pool_id = aws_cognito_user_pool.main.id
+  username     = aws_cognito_user.admin.username
+  group_name   = aws_cognito_user_group.admin_group.name
+}
+
+resource "null_resource" "set_admin_password" {
+
+  depends_on = [
+    aws_cognito_user.admin
+  ]
+
+  triggers = {
+    username = aws_cognito_user.admin.username
+  }
+
+  provisioner "local-exec" {
+    command = <<EOT
+aws cognito-idp admin-set-user-password \
+  --user-pool-id ${aws_cognito_user_pool.main.id} \
+  --username ${var.admin_email} \
+  --password '${var.admin_password}' \
+  --permanent
+EOT
+  }
+}
 # =========================================================================
 # 3. COMPUTE & FIREWALL SETUP (EC2 Host)
 # =========================================================================
@@ -432,6 +532,8 @@ services:
       - LOCALSTACK_ENDPOINT=
       - CELERY_QUEUE_NAME=${var.celery_queue_name}
       - CELERY_TASK_QUEUE_URL=${aws_sqs_queue.celery_task_queue.url}
+      - USER_POOL_CLIENT_ID=${aws_cognito_user_pool_client.client.id}
+      - USER_POOL_ID=${aws_cognito_user_pool.main.id}
     restart: unless-stopped
 
   celery:
@@ -466,6 +568,8 @@ EOF
   }
 }
 
+
+
 # =========================================================================
 # OUTPUTS
 # =========================================================================
@@ -493,4 +597,11 @@ output "frontend_cdn_id" {
 output "server_instance_id" {
   value       = aws_instance.app_server.id
   description = "The ID of the EC2 instance for target matching in SSM"
+}
+output "user_pool_id" {
+  value = aws_cognito_user_pool.main.id
+}
+
+output "user_pool_client_id" {
+  value = aws_cognito_user_pool_client.client.id
 }

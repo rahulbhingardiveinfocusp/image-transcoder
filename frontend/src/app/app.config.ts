@@ -24,17 +24,11 @@ export const appConfig: ApplicationConfig = {
 };
 
 export const awsConfig = {
-
   Auth: {
-
     Cognito: {
-      region:environment.AWS_REGION,
-      userPoolId:
-        environment.cognitoUserPoolId,
-
-      userPoolClientId:
-        environment.cognitoClientId,
-
+      userPoolId: environment.cognitoUserPoolId,
+      userPoolClientId: environment.cognitoClientId,
+      region: environment.cognitoRegion,    
       loginWith: {
         email: true
       }
