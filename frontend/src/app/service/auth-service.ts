@@ -76,6 +76,6 @@ export class AuthService {
 
     const groups = await this.getGroups();
 
-    return groups.includes('Admins');
+    return groups.includes('Admin');
   }
 }
