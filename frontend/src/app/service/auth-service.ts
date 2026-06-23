@@ -40,7 +40,9 @@ export class AuthService {
   }
 
   async logout() {
-    return signOut();
+    signOut();
+    window.location.reload()
+    return true
   }
 
   async currentUser() {

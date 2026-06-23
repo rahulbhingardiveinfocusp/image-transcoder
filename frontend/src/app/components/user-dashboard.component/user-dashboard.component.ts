@@ -13,6 +13,7 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient, HttpClientModule } from '@angular/common/http';
 import { interval, Subject, takeUntil } from 'rxjs';
 import { environment } from '../../../environments/environment';
+import { AuthService } from '../../service/auth-service';
 
 type PreSignedResponse = {
   image_id: string;
@@ -58,6 +59,7 @@ export class UserDashboardComponent {
   constructor(
     private http: HttpClient,
     private cdr: ChangeDetectorRef,
+    private auth: AuthService
   ) {}
 
   ngOnInit(): void {
@@ -239,5 +241,8 @@ export class UserDashboardComponent {
     document.execCommand('copy');
     document.body.removeChild(el);
     alert('Link copied to clipboard');
+  }
+  logout(){
+    this.auth.logout()
   }
 }
