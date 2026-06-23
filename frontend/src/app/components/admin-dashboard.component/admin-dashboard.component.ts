@@ -3,11 +3,8 @@ import { AuthService } from '../../service/auth-service';
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  template: `
-    <h1>Admin Dashboard</h1>
-
-    <p>Only Admin users can see this page.</p>
-  `
+  templateUrl: './admin-dashboard.component.html',
+  styleUrls: ['./admin-dashboard.component.css']
 })
 export class AdminDashboardComponent {
     constructor(
