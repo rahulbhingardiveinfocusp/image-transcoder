@@ -552,6 +552,8 @@ services:
       - LOCALSTACK_ENDPOINT=
       - CELERY_QUEUE_NAME=${var.celery_queue_name}
       - CELERY_TASK_QUEUE_URL=${aws_sqs_queue.celery_task_queue.url}
+      - USER_POOL_CLIENT_ID=${aws_cognito_user_pool_client.client.id}
+      - USER_POOL_ID=${aws_cognito_user_pool.main.id}
     restart: unless-stopped
 
 volumes:
