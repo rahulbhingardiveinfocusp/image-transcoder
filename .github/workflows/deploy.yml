@@ -82,8 +82,10 @@ jobs:
             terraform apply -auto-approve
             REAL_IP=$(terraform output -raw server_public_ip)
             INSTANCE_ID=$(terraform output -raw server_instance_id)
+            CDN_ID=$(terraform output -raw frontend_cdn_id)        # 👈 add
             echo "fetched_ip=$REAL_IP" >> $GITHUB_OUTPUT
             echo "fetched_instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
+            echo "fetched_cdn_id=$CDN_ID" >> $GITHUB_OUTPUT 
           else
             terraform destroy -auto-approve
           fi
@@ -107,6 +109,8 @@ jobs:
         working-directory: ./frontend
         env:
           AWS_REGION: ${{ secrets.AWS_REGION }} 
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}        # 👈 add
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           npm ci
           COGNITO_POOL_ID=$(cd ../terraform && terraform output -raw user_pool_id)
@@ -150,8 +154,8 @@ jobs:
       - name: Invalidate CloudFront Cache
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         run: |
-          CLOUDFRONT_DIST_ID=$(cd ./terraform && terraform output -raw frontend_cdn_id || echo "")
-          if [ ! -z "$CLOUDFRONT_DIST_ID" ] && [ "$CLOUDFRONT_DIST_ID" != "Warning" ]; then
+          CLOUDFRONT_DIST_ID="${{ steps.terraform_step.outputs.fetched_cdn_id }}"
+          if [ -n "$CLOUDFRONT_DIST_ID" ]; then
             aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DIST_ID" --paths "/*"
           fi
 
