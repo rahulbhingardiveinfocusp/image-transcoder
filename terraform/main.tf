@@ -20,14 +20,23 @@ variable "aws_region" {
   type    = string
   default = "us-west-1"
 }
-variable "s3_bucket_name"      { type = string }
-variable "sqs_queue_name"      { type = string; default = "image-processing-queue" }
-variable "dockerhub_username"  { type = string }
-variable "docker_repo"         { type = string }
-variable "celery_queue_name"   { type = string }
-variable "dynamo_images_table" { type = string; default = "images" }  # FIX: new var so table name flows into containers
-variable "admin_email"         { type = string }
-variable "admin_password"      { type = string; sensitive = true }
+variable "s3_bucket_name"     { type = string }
+variable "sqs_queue_name" {
+  type    = string
+  default = "image-processing-queue"
+}
+variable "dockerhub_username" { type = string }
+variable "docker_repo"        { type = string }
+variable "celery_queue_name"  { type = string }
+variable "dynamo_images_table" {
+  type    = string
+  default = "images"
+}
+variable "admin_email" { type = string }
+variable "admin_password" {
+  type      = string
+  sensitive = true
+}
 
 provider "aws" {
   region = var.aws_region
@@ -407,8 +416,14 @@ resource "aws_cloudfront_distribution" "frontend_cdn" {
     error_caching_min_ttl = 10
   }
 
-  restrictions { geo_restriction { restriction_type = "none" } }
-  viewer_certificate { cloudfront_default_certificate = true }
+  restrictions {
+    geo_restriction {
+      restriction_type = "none"
+    }
+  }
+  viewer_certificate {
+    cloudfront_default_certificate = true
+  }
 }
 
 resource "aws_s3_bucket_policy" "allow_cloudfront" {
