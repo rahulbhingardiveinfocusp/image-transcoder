@@ -148,10 +148,22 @@ resource "aws_dynamodb_table" "images" {
   hash_key  = "PK"
   range_key = "SK"
 
-  attribute { name = "PK";     type = "S" }
-  attribute { name = "SK";     type = "S" }
-  attribute { name = "GSI1PK"; type = "S" }  # STATUS#<value>
-  attribute { name = "GSI1SK"; type = "S" }  # created_at ISO string
+  attribute {
+    name = "PK"
+    type = "S"
+  }
+  attribute {
+    name = "SK"
+    type = "S"
+  }
+  attribute {
+    name = "GSI1PK"
+    type = "S"
+  }
+  attribute {
+    name = "GSI1SK"
+    type = "S"
+  }
 
   # FIX: renamed from StatusIndex → GSI1 to match index_name used in
   # dynamo_image_repo.py query_by_gsi("GSI1", ...)
@@ -237,9 +249,24 @@ resource "aws_security_group" "app_sg" {
   name_prefix = "fastapi-sg-"
   description = "Allow web and API traffic"
 
-  ingress { from_port = 80;   to_port = 80;   protocol = "tcp"; cidr_blocks = ["0.0.0.0/0"] }
-  ingress { from_port = 8000; to_port = 8000; protocol = "tcp"; cidr_blocks = ["0.0.0.0/0"] }
-  egress  { from_port = 0;    to_port = 0;    protocol = "-1";  cidr_blocks = ["0.0.0.0/0"] }
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  ingress {
+    from_port   = 8000
+    to_port     = 8000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
 
   lifecycle { create_before_destroy = true }
 }
@@ -463,7 +490,10 @@ resource "aws_cognito_user_pool" "main" {
     mutable                  = true
     name                     = "email"
     required                 = true
-    string_attribute_constraints { min_length = 7; max_length = 256 }
+    string_attribute_constraints {
+      min_length = 7
+      max_length = 256
+    }
   }
 }
 
@@ -494,7 +524,10 @@ resource "aws_cognito_user_group" "user_group" {
 resource "aws_cognito_user" "admin" {
   user_pool_id = aws_cognito_user_pool.main.id
   username     = var.admin_email
-  attributes   = { email = var.admin_email; email_verified = "true" }
+  attributes = {
+    email          = var.admin_email
+    email_verified = "true"
+  }
 }
 
 resource "aws_cognito_user_in_group" "admin_membership" {
