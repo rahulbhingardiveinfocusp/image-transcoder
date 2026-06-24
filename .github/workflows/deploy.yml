@@ -29,7 +29,6 @@ jobs:
 
       - name: Install Dependencies & Run Tests
         run: |
-          cd backend
           pip install -r requirements.txt
           # FIX: tests no longer need a real Postgres — the suite mocks
           # DynamoImageRepository so pytest runs cleanly in CI with no infra.
