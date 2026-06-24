@@ -1,3 +1,4 @@
+#deps.py
 from app.services.dynamo_service import DynamoService
 from app.repository.dynamo_image_repo import DynamoImageRepository
 from app.core.config import settings

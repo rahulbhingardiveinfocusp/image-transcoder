@@ -28,10 +28,9 @@ jobs:
           python-version: '3.11'
 
       - name: Install Dependencies & Run Tests
+        working-directory: ./backend
         run: |
           pip install -r requirements.txt
-          # FIX: tests no longer need a real Postgres — the suite mocks
-          # DynamoImageRepository so pytest runs cleanly in CI with no infra.
           pytest
 
       - name: Build & Push Backend to DockerHub
@@ -62,24 +61,22 @@ jobs:
         id: terraform_step
         working-directory: ./terraform
         env:
-          AWS_ACCESS_KEY_ID:       ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY:   ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION:      ${{ secrets.AWS_REGION }}
-          TF_VAR_aws_region:       ${{ secrets.AWS_REGION }}
-          TF_VAR_s3_bucket_name:   ${{ secrets.S3_BUCKET_NAME }}
-          TF_VAR_dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
-          TF_VAR_docker_repo:      ${{ secrets.DOCKER_REPO }}
-          TF_VAR_celery_queue_name: ${{ secrets.CELERY_QUEUE_NAME }}
-          TF_VAR_admin_email:      ${{ secrets.ADMIN_EMAIL }}
-          TF_VAR_admin_password:   ${{ secrets.ADMIN_PASSWORD }}
-          # FIX: new variable — must be passed so the table name flows into
-          # the docker-compose env block inside user_data
+          AWS_ACCESS_KEY_ID:          ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY:      ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:         ${{ secrets.AWS_REGION }}
+          TF_VAR_aws_region:          ${{ secrets.AWS_REGION }}
+          TF_VAR_s3_bucket_name:      ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_dockerhub_username:  ${{ secrets.DOCKERHUB_USERNAME }}
+          TF_VAR_docker_repo:         ${{ secrets.DOCKER_REPO }}
+          TF_VAR_celery_queue_name:   ${{ secrets.CELERY_QUEUE_NAME }}
+          TF_VAR_admin_email:         ${{ secrets.ADMIN_EMAIL }}
+          TF_VAR_admin_password:      ${{ secrets.ADMIN_PASSWORD }}
           TF_VAR_dynamo_images_table: ${{ secrets.DYNAMO_IMAGES_TABLE }}
         run: |
           terraform init
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
             terraform apply -auto-approve
-            echo "fetched_ip=$(terraform output -raw server_public_ip)"           >> $GITHUB_OUTPUT
+            echo "fetched_ip=$(terraform output -raw server_public_ip)"            >> $GITHUB_OUTPUT
             echo "fetched_instance_id=$(terraform output -raw server_instance_id)" >> $GITHUB_OUTPUT
             echo "fetched_cdn_id=$(terraform output -raw frontend_cdn_id)"         >> $GITHUB_OUTPUT
           else
