@@ -57,7 +57,7 @@ provider "aws" {
 }
 
 # =========================================================================
-# 1. BACKEND STORAGE (S3) & SQS SETUP
+# 1. BACKEND STORAGE (S3) DB & SQS SETUP
 # =========================================================================
 resource "aws_s3_bucket" "app_bucket" { 
   bucket        = var.s3_bucket_name 
@@ -189,7 +189,43 @@ resource "aws_iam_role_policy" "ec2_policy" {
     ]
   })
 }
+resource "aws_dynamodb_table" "images" {
+  name         = "images"
+  billing_mode = "PAY_PER_REQUEST"
 
+  hash_key = "id"
+
+  attribute {
+    name = "id"
+    type = "S"
+  }
+
+  attribute {
+    name = "created_by"
+    type = "S"
+  }
+
+  attribute {
+    name = "created_at"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "CreatedByIndex"
+    hash_key        = "created_by"
+    range_key       = "created_at"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  tags = {
+    Environment = "test"
+    Application = "image-processor"
+  }
+}
 # =========================================================================
 # 2. FRONTEND HOSTING (S3 WITH "-frontend" SUFFIX + CLOUDFRONT CDN)
 # =========================================================================
