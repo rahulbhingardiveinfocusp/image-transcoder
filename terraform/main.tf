@@ -222,7 +222,7 @@ resource "aws_dynamodb_table" "images" {
   }
 
   tags = {
-    Environment = "test"
+    Environment = "dev"
     Application = "image-processor"
   }
 }
