@@ -13,7 +13,7 @@ on:
 
 jobs:
   # =========================================================================
-  # 1. AUTOMATIC ON PUSH: Test, Build, and Push Images Only
+  # 1. AUTOMATIC ON PUSH: Test, Build, Push
   # =========================================================================
   build-and-test:
     if: github.event_name == 'push'
@@ -22,23 +22,21 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # --- STEP A: RUN BACKEND TESTS ---
       - name: Set up Python Environment
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-          
-      - name: Install Test Dependencies & Run Tests
+
+      - name: Install Dependencies & Run Tests
         run: |
           cd backend
           pip install -r requirements.txt
-          # pytest # 👈 Uncomment this when your test suite is ready!
+          # FIX: tests no longer need a real Postgres — the suite mocks
+          # DynamoImageRepository so pytest runs cleanly in CI with no infra.
+          pytest
 
-      # --- STEP B: BUILD & PUSH TO DOCKER HUB ---
       - name: Build & Push Backend to DockerHub
         run: |
-          echo "Username length: ${#DOCKERHUB_USERNAME}"
-          echo "Repo length: ${#DOCKER_REPO}"
           echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
           docker build -t "${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest" ./backend
           docker push "${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.DOCKER_REPO }}:latest"
@@ -47,12 +45,12 @@ jobs:
           DOCKER_REPO: ${{ secrets.DOCKER_REPO }}
 
   # =========================================================================
-  # 2. MANUAL WORKFLOW DISPATCH: Complete Infrastructure & App Deployment
+  # 2. MANUAL DISPATCH: Infrastructure + App Deployment
   # =========================================================================
   deploy-infrastructure:
     if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    environment: dev 
+    environment: dev
     steps:
       - uses: actions/checkout@v4
 
@@ -61,42 +59,40 @@ jobs:
         with:
           terraform_version: "1.7.0"
 
-      # --- STEP A: PROVISION OR DESTROY AWS CORE ---
       - name: Execute Terraform
         id: terraform_step
         working-directory: ./terraform
-        env: 
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }} 
-          TF_VAR_aws_region: ${{ secrets.AWS_REGION }}   
-          TF_VAR_s3_bucket_name: ${{ secrets.S3_BUCKET_NAME }}
+        env:
+          AWS_ACCESS_KEY_ID:       ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY:   ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:      ${{ secrets.AWS_REGION }}
+          TF_VAR_aws_region:       ${{ secrets.AWS_REGION }}
+          TF_VAR_s3_bucket_name:   ${{ secrets.S3_BUCKET_NAME }}
           TF_VAR_dockerhub_username: ${{ secrets.DOCKERHUB_USERNAME }}
-          TF_VAR_docker_repo: ${{ secrets.DOCKER_REPO }}
+          TF_VAR_docker_repo:      ${{ secrets.DOCKER_REPO }}
           TF_VAR_celery_queue_name: ${{ secrets.CELERY_QUEUE_NAME }}
-          TF_VAR_admin_email: ${{ secrets.ADMIN_EMAIL }}
-          TF_VAR_admin_password: ${{ secrets.ADMIN_PASSWORD }}
+          TF_VAR_admin_email:      ${{ secrets.ADMIN_EMAIL }}
+          TF_VAR_admin_password:   ${{ secrets.ADMIN_PASSWORD }}
+          # FIX: new variable — must be passed so the table name flows into
+          # the docker-compose env block inside user_data
+          TF_VAR_dynamo_images_table: ${{ secrets.DYNAMO_IMAGES_TABLE }}
         run: |
           terraform init
           if [ "${{ github.event.inputs.action }}" == "deploy" ]; then
             terraform apply -auto-approve
-            REAL_IP=$(terraform output -raw server_public_ip)
-            INSTANCE_ID=$(terraform output -raw server_instance_id)
-            CDN_ID=$(terraform output -raw frontend_cdn_id)        # 👈 add
-            echo "fetched_ip=$REAL_IP" >> $GITHUB_OUTPUT
-            echo "fetched_instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
-            echo "fetched_cdn_id=$CDN_ID" >> $GITHUB_OUTPUT 
+            echo "fetched_ip=$(terraform output -raw server_public_ip)"           >> $GITHUB_OUTPUT
+            echo "fetched_instance_id=$(terraform output -raw server_instance_id)" >> $GITHUB_OUTPUT
+            echo "fetched_cdn_id=$(terraform output -raw frontend_cdn_id)"         >> $GITHUB_OUTPUT
           else
             terraform destroy -auto-approve
           fi
 
-      # --- STEP B: CONFIGURE & BUILD ANGULAR WITH THE ACTIVE IP ---
       - name: Setup Node.js Environment
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          
+
       - name: Configure npm Network Resilience
         run: |
           npm config set fetch-retry-maxtimeout 120000
@@ -108,75 +104,68 @@ jobs:
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         working-directory: ./frontend
         env:
-          AWS_REGION: ${{ secrets.AWS_REGION }} 
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}        # 👈 add
+          AWS_REGION:            ${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         run: |
           npm ci
           COGNITO_POOL_ID=$(cd ../terraform && terraform output -raw user_pool_id)
           COGNITO_CLIENT_ID=$(cd ../terraform && terraform output -raw user_pool_client_id)
           BACKEND_IP="${{ steps.terraform_step.outputs.fetched_ip }}"
-          
-          echo "Injecting variables into Angular production config..."
-          
-          # 2. Replace placeholders in the environment file using sed
-          sed -i "s#BACKEND_API_URL_PLACEHOLDER#http://${BACKEND_IP}:8000#g" src/environments/environment.prod.ts
-          sed -i "s#COGNITO_USER_POOL_ID_PLACEHOLDER#${COGNITO_POOL_ID}#g" src/environments/environment.prod.ts
-          sed -i "s#COGNITO_CLIENT_ID_PLACEHOLDER#${COGNITO_CLIENT_ID}#g" src/environments/environment.prod.ts
-          sed -i "s#COGNITO_REGION_PLACEHOLDER#${AWS_REGION}#g" src/environments/environment.prod.ts 
-          # 3. Build the static production assets
+
+          sed -i "s#BACKEND_API_URL_PLACEHOLDER#http://${BACKEND_IP}:8000#g"  src/environments/environment.prod.ts
+          sed -i "s#COGNITO_USER_POOL_ID_PLACEHOLDER#${COGNITO_POOL_ID}#g"    src/environments/environment.prod.ts
+          sed -i "s#COGNITO_CLIENT_ID_PLACEHOLDER#${COGNITO_CLIENT_ID}#g"     src/environments/environment.prod.ts
+          sed -i "s#COGNITO_REGION_PLACEHOLDER#${AWS_REGION}#g"               src/environments/environment.prod.ts
+
           npm run build -- --configuration=production
 
-      # --- STEP C: PUSH STATIC FRONTEND ASSETS TO S3 ---
       - name: Configure AWS Credentials
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-access-key-id:     ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          aws-region:            ${{ secrets.AWS_REGION }}
 
       - name: Deploy Frontend Files with Correct MIME Mappings
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         run: |
           aws s3 sync ./frontend/dist/*/browser s3://${{ secrets.S3_BUCKET_NAME }}-frontend --delete
-          
-          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ \
-            --exclude "*" --include "*.js" --recursive --metadata-directive REPLACE --content-type "application/javascript"
-            
-          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ \
-            --exclude "*" --include "*.css" --recursive --metadata-directive REPLACE --content-type "text/css"
-            
-          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html \
-            --metadata-directive REPLACE --content-type "text/html" --cache-control "no-cache, no-store, must-revalidate"
 
-      # --- STEP D: PURGE THE CLOUDFRONT CACHE ---
+          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ \
+            --exclude "*" --include "*.js" --recursive \
+            --metadata-directive REPLACE --content-type "application/javascript"
+
+          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ s3://${{ secrets.S3_BUCKET_NAME }}-frontend/ \
+            --exclude "*" --include "*.css" --recursive \
+            --metadata-directive REPLACE --content-type "text/css"
+
+          aws s3 cp s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html \
+            s3://${{ secrets.S3_BUCKET_NAME }}-frontend/index.html \
+            --metadata-directive REPLACE --content-type "text/html" \
+            --cache-control "no-cache, no-store, must-revalidate"
+
       - name: Invalidate CloudFront Cache
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         run: |
           CLOUDFRONT_DIST_ID="${{ steps.terraform_step.outputs.fetched_cdn_id }}"
           if [ -n "$CLOUDFRONT_DIST_ID" ]; then
-            aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DIST_ID" --paths "/*"
+            aws cloudfront create-invalidation \
+              --distribution-id "$CLOUDFRONT_DIST_ID" --paths "/*"
           fi
 
-      # --- STEP E: TELL EC2 WORKER TO RUN THE NEW IMAGE ---
-      # --- STEP E: TELL EC2 WORKER TO RUN THE NEW IMAGE VIA AWS SSM ---
-      - name: Refresh Live Docker Containers via AWS Systems Manager
+      - name: Refresh Live Docker Containers via SSM
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_instance_id != ''
         run: |
-          echo "Sending deployment command to instance: ${{ steps.terraform_step.outputs.fetched_instance_id }}"
-          
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "${{ steps.terraform_step.outputs.fetched_instance_id }}" \
             --document-name "AWS-RunShellScript" \
             --parameters 'commands=["cd /home/ubuntu/app", "sudo docker-compose pull fastapi celery", "sudo docker-compose up -d --force-recreate fastapi celery"]' \
             --query "Command.CommandId" \
             --output text)
-          
-          echo "Command sent successfully. ID: $COMMAND_ID"
-          echo "Waiting for command execution to finish..."
-          
-          # Optional: Block and wait until the script finishes running on the EC2 host to verify success
+
+          echo "Command ID: $COMMAND_ID"
           aws ssm wait command-executed \
             --command-id "$COMMAND_ID" \
             --instance-id "${{ steps.terraform_step.outputs.fetched_instance_id }}"

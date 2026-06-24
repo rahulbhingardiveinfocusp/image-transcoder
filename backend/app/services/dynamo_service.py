@@ -1,18 +1,27 @@
-from app.core.config import Settings
-import boto3
 import anyio
+import boto3
 from typing import Optional, Dict, Any, List
-from typing import Optional, Any, List
+
+from app.core.config import settings
+
 
 def format_response(items: List[dict], last_key: Optional[dict]):
     return {
         "items": items,
-        "last_evaluated_key": last_key
+        "last_evaluated_key": last_key,
     }
+
+
 class DynamoService:
 
-    def __init__(self, table_name: str, ):
-        self.dynamodb = boto3.resource("dynamodb", region_name=Settings.AWS_REGION)
+    def __init__(self, table_name: str):
+        self.dynamodb = boto3.resource(
+            "dynamodb",
+            region_name=settings.AWS_REGION,                      # FIX: was `Settings` (undefined)
+            endpoint_url=settings.LOCALSTACK_ENDPOINT or None,    # FIX: honour localstack in dev
+            aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
+            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
+        )
         self.table = self.dynamodb.Table(table_name)
 
     # -----------------------
@@ -20,22 +29,14 @@ class DynamoService:
     # -----------------------
 
     def _get_item(self, pk: str, sk: str) -> Optional[Dict[str, Any]]:
-        resp = self.table.get_item(
-            Key={
-                "PK": pk,
-                "SK": sk
-            }
-        )
+        resp = self.table.get_item(Key={"PK": pk, "SK": sk})
         return resp.get("Item")
 
     def _put_item(self, item: Dict[str, Any]) -> None:
         self.table.put_item(Item=item)
 
     def _delete_item(self, pk: str, sk: str) -> None:
-        self.table.delete_item( Key={
-                "PK": pk,
-                "SK": sk
-            })
+        self.table.delete_item(Key={"PK": pk, "SK": sk})
 
     def _update_item(
         self,
@@ -50,57 +51,47 @@ class DynamoService:
             "UpdateExpression": update_expression,
             "ExpressionAttributeValues": expression_values,
         }
-
         if expression_names:
             params["ExpressionAttributeNames"] = expression_names
-
         return self.table.update_item(**params)
-    
+
     def _query_by_gsi(
         self,
         index_name: str,
-        key_condition_expression,
-        expression_values: Dict[str, Any],
+        key_condition_expression,           # boto3 ConditionBase object
         limit: int = 20,
         scan_forward: bool = False,
         exclusive_start_key: Optional[Dict[str, Any]] = None,
         expression_names: Optional[Dict[str, str]] = None,
     ):
+        # FIX: removed `expression_values` param — boto3 Key() conditions carry
+        # their own values; passing ExpressionAttributeValues separately causes
+        # "Value provided in ExpressionAttributeValues unused" errors.
         params = {
             "IndexName": index_name,
             "KeyConditionExpression": key_condition_expression,
-            "ExpressionAttributeValues": expression_values,
             "Limit": limit,
             "ScanIndexForward": scan_forward,
         }
-
         if exclusive_start_key:
             params["ExclusiveStartKey"] = exclusive_start_key
-
         if expression_names:
             params["ExpressionAttributeNames"] = expression_names
-
         return self.table.query(**params)
 
-    
     # -----------------------
     # ASYNC PUBLIC METHODS
     # -----------------------
 
     async def get_item(self, pk: str, sk: str) -> Optional[Dict[str, Any]]:
-        return await anyio.to_thread.run_sync(
-            self._get_item, pk, sk
-        )
+        return await anyio.to_thread.run_sync(self._get_item, pk, sk)
 
     async def put_item(self, item: Dict[str, Any]) -> None:
-        return await anyio.to_thread.run_sync(
-            self._put_item, item
-        )
-    async def delete_item(self, pk: str, sk: str) -> Optional[Dict[str, Any]]:
-        return await anyio.to_thread.run_sync(
-            self._delete_item, pk, sk
-        )
-    
+        await anyio.to_thread.run_sync(self._put_item, item)
+
+    async def delete_item(self, pk: str, sk: str) -> None:
+        await anyio.to_thread.run_sync(self._delete_item, pk, sk)
+
     async def update_item(
         self,
         pk: str,
@@ -117,17 +108,23 @@ class DynamoService:
             expression_values,
             expression_names,
         )
+
     async def query_by_gsi(
         self,
         index_name: str,
         key_condition_expression,
-        expression_values: Dict[str, Any],
+        limit: int = 20,
+        scan_forward: bool = False,
+        exclusive_start_key: Optional[Dict[str, Any]] = None,
         expression_names: Optional[Dict[str, str]] = None,
     ):
+        # FIX: signature now matches _query_by_gsi exactly (no expression_values)
         return await anyio.to_thread.run_sync(
             self._query_by_gsi,
             index_name,
             key_condition_expression,
-            expression_values,
+            limit,
+            scan_forward,
+            exclusive_start_key,
             expression_names,
         )

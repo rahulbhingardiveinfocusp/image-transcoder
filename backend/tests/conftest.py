@@ -1,45 +1,44 @@
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker
+from unittest.mock import AsyncMock, MagicMock
+from httpx import AsyncClient, ASGITransport
+
 from app.main import app
-from app.core.database import get_db, Base
+from app.deps import get_image_repo
+from app.repository.dynamo_image_repo import DynamoImageRepository
 
-# Use an in-memory SQLite database for fast, ephemeral testing
-TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 
-engine = create_async_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+def make_mock_repo() -> DynamoImageRepository:
+    """
+    Returns a MagicMock that satisfies DynamoImageRepository's async interface.
+    Every method that image_service / router awaits must be an AsyncMock.
+    """
+    repo = MagicMock(spec=DynamoImageRepository)
+    repo.create = AsyncMock()
+    repo.get_by_id = AsyncMock(return_value=None)
+    repo.update_status = AsyncMock()
+    repo.list_by_status = AsyncMock(return_value={"items": [], "last_key": None})
+    repo.list_all = AsyncMock(return_value=[])
+    return repo
 
-@pytest_asyncio.fixture(autouse=True)
-async def setup_db():
-    """Create tables in the test database before tests and drop them after."""
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
 
 @pytest_asyncio.fixture
-async def db_session():
-    """Provides a fresh database session for each test."""
-    async with TestingSessionLocal() as session:
-        yield session
+async def mock_repo() -> DynamoImageRepository:
+    """Bare mock repo — tests can customise return values as needed."""
+    return make_mock_repo()
+
 
 @pytest_asyncio.fixture
-async def client(db_session):
+async def client(mock_repo):
     """
-    Overrides the get_db dependency to use the test session 
-    and returns an async test client.
+    AsyncClient with get_image_repo overridden to use the mock repo.
+    Replaces the old fixture that overrode get_db with a SQLite session.
     """
-    def override_get_db():
-        yield db_session
+    app.dependency_overrides[get_image_repo] = lambda: mock_repo
 
-    app.dependency_overrides[get_db] = override_get_db
-    
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
         yield ac
-    
-    # Clean up overrides
+
     app.dependency_overrides.clear()

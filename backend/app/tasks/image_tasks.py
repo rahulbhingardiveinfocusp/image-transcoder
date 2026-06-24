@@ -2,14 +2,14 @@ import asyncio
 import logging
 import urllib.parse
 from io import BytesIO
+
 from PIL import Image as PILImage
-from sqlalchemy import select
-from app.models.image import Image, ProcessingStatus
 from celery.exceptions import MaxRetriesExceededError
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 
 from app.tasks.celery_app import celery_app
 from app.services.image_service import ImageService
+from app.deps import get_image_repo
+from app.dto.image import ProcessingStatus
 from app.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -41,45 +41,69 @@ def process_s3_upload_task(self, bucket: str, key: str):
 async def run_processing_logic(bucket: str, key: str) -> dict:
     decoded_key = urllib.parse.unquote(key)
     thumbnail_key: str | None = None
-    engine = create_async_engine(
-        settings.DATABASE_URL,
-        pool_size=1,
-        pool_pre_ping=True,
-    )
-    session_factory = async_sessionmaker(engine, expire_on_commit=False)
-    try:
-        async with session_factory() as session:
-            if await ImageService.already_processed(session, bucket, decoded_key):
-                logger.info("[-] Already completed, skipping: %s", decoded_key)
-                return {"status": "already_processed"}
-            result = await session.execute(
-                select(Image).where(Image.s3_key == decoded_key)
-            )
-            image_record = result.scalars().first()
-            if not image_record:
-                raise ValueError(f"No image found for key: {decoded_key}")
-            try:
-                image_data = await ImageService.download_image(bucket, decoded_key)
-                if not image_data:
-                    raise RuntimeError(
-                        f"key not found {bucket}/{decoded_key}"
-                    )
-                thumbnail_data = await asyncio.to_thread(_generate_thumbnail, image_data)
-                filename = decoded_key.split("/")[-1]
-                thumbnail_key = f"thumbnails/{filename}"
-                await ImageService.upload_thumbnail(bucket, thumbnail_key, thumbnail_data)
-                new_key = await ImageService.process_image(session, bucket, decoded_key)  
-                image_record.s3_key = new_key
-                image_record.status = ProcessingStatus.COMPLETED
-                image_record.s3_processed_file =  thumbnail_key
-                await session.commit()
-            except Exception:
-                image_record.status = ProcessingStatus.FAILED
-                await session.commit()
-                raise
 
-    finally:
-        await engine.dispose()
+    # FIX: no engine/session — get the singleton DynamoImageRepository
+    repo = get_image_repo()
+
+    # -----------------------
+    # ALREADY PROCESSED?
+    # -----------------------
+    if await ImageService.already_processed(repo, decoded_key):
+        logger.info("[-] Already completed, skipping: %s", decoded_key)
+        return {"status": "already_processed"}
+
+    # -----------------------
+    # FIND THE RECORD
+    # -----------------------
+    # FIX: was a raw `select(Image).where(...)` SQL query
+    all_items = await repo.list_all()
+    image_record = next((i for i in all_items if i.get("s3_key") == decoded_key), None)
+
+    if not image_record:
+        raise ValueError(f"No image found for key: {decoded_key}")
+
+    image_id = image_record["id"]
+
+    # -----------------------
+    # MARK AS PROCESSING
+    # -----------------------
+    # FIX: was `image_record.status = ProcessingStatus.PROCESSING` + session.commit()
+    await repo.update_status(image_id, ProcessingStatus.PROCESSING.value.upper())
+
+    try:
+        # -----------------------
+        # DOWNLOAD → THUMBNAIL → UPLOAD
+        # -----------------------
+        image_data = await ImageService.download_image(bucket, decoded_key)
+        if not image_data:
+            raise RuntimeError(f"Key not found: {bucket}/{decoded_key}")
+
+        thumbnail_data = await asyncio.to_thread(_generate_thumbnail, image_data)
+        filename = decoded_key.split("/")[-1]
+        thumbnail_key = f"thumbnails/{filename}"
+        await ImageService.upload_thumbnail(bucket, thumbnail_key, thumbnail_data)
+
+        # -----------------------
+        # PROCESS (S3 copy raw → processed)
+        # -----------------------
+        # FIX: was `ImageService.process_image(session, ...)` — now passes repo
+        new_key = await ImageService.process_image(repo, bucket, decoded_key)
+
+        # -----------------------
+        # MARK AS COMPLETED
+        # -----------------------
+        # FIX: was three separate ORM field assignments + session.commit()
+        # update_status now accepts processed_key to do it in one write
+        await repo.update_status(
+            image_id,
+            ProcessingStatus.COMPLETED.value.upper(),
+            processed_key=thumbnail_key,
+        )
+
+    except Exception:
+        # FIX: was `image_record.status = ProcessingStatus.FAILED` + session.commit()
+        await repo.update_status(image_id, ProcessingStatus.FAILED.value.upper())
+        raise
 
     logger.info(
         "[+] Task successful: s3://%s/%s -> %s", bucket, decoded_key, thumbnail_key
