@@ -67,7 +67,7 @@ async def test_get_all_images_returns_list(client: AsyncClient, mock_repo):
 
     mock_repo.list_all = AsyncMock(return_value=[
         {
-            "id": "abc-123",
+            "id": "123e4567-e89b-12d3-a456-426614174000",
             "filename": "photo.jpg",
             "status": "COMPLETED",
             "s3_key": "raw/abc-123-photo.jpg",
@@ -85,7 +85,7 @@ async def test_get_all_images_returns_list(client: AsyncClient, mock_repo):
     assert response.status_code == 200
     items = response.json()
     assert len(items) == 1
-    assert items[0]["id"] == "abc-123"
+    assert items[0]["id"] == "123e4567-e89b-12d3-a456-426614174000"
     assert items[0]["status"] == "completed"   # service lowercases before returning
     assert "url" in items[0]
     assert "s3_key" in items[0]

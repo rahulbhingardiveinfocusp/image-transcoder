@@ -75,7 +75,7 @@ async def test_already_processed_returns_false_when_key_absent():
 @pytest.mark.asyncio
 async def test_process_image_copies_and_deletes_s3_object():
     existing_item = {
-        "id": "abc-123",
+        "id": "123e4567-e89b-12d3-a456-426614174000",
         "filename": "photo.jpg",
         "status": "PENDING",
         "s3_key": "raw/abc-123-photo.jpg",
@@ -118,7 +118,7 @@ async def test_get_all_images_maps_dynamo_items_correctly():
     repo = make_mock_repo(
         list_all=AsyncMock(return_value=[
             {
-                "id": "abc-123",
+                "id": "123e4567-e89b-12d3-a456-426614174000",
                 "filename": "photo.jpg",
                 "status": "COMPLETED",
                 "s3_key": "raw/abc-123-photo.jpg",
@@ -136,7 +136,7 @@ async def test_get_all_images_maps_dynamo_items_correctly():
 
     assert len(result) == 1
     item = result[0]
-    assert item["id"] == "abc-123"
+    assert item["id"] == "123e4567-e89b-12d3-a456-426614174000"
     assert item["status"] == "completed"        # lowercased by service
     assert item["url"] == "https://s3.example.com/presigned"
     assert item["s3_key"] == "https://s3.example.com/presigned"
