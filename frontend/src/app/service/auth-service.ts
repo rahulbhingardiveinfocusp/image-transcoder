@@ -70,8 +70,18 @@ export class AuthService {
     return groups.includes('Admin');
   }
 
-  async getJwt() {
-    const session = await fetchAuthSession();
-    return session.tokens?.idToken?.toString();
+  async getJwt(): Promise<string | null> {
+    try {
+      const session = await fetchAuthSession();
+
+      const token = session.tokens?.accessToken?.toString();
+
+      console.log('AuthService token:', token);
+
+      return token ?? null;
+    } catch (e) {
+      console.error('getJwt failed:', e);
+      return null;
+    }
   }
 }

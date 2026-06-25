@@ -1,21 +1,22 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
-import { from } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
-import { environment } from '../environments/environment';
+import { from, of } from 'rxjs';
+import { switchMap, catchError } from 'rxjs/operators';
 import { AuthService } from './service/auth-service';
 
-
-
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
-  // Don't send JWT to S3 presigned URLs or external services
-  if (!req.url.includes('/api/')) {
+  const auth = inject(AuthService);
+
+  const isApi = req.url.includes('/api/');
+
+  if (!isApi) {
     return next(req);
   }
-  const auth = inject(AuthService);
 
   return from(auth.getJwt()).pipe(
     switchMap((token) => {
+      console.log('JWT token in interceptor:', token);
+
       if (!token) {
         return next(req);
       }
@@ -27,6 +28,10 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
           },
         })
       );
+    }),
+    catchError((err) => {
+      console.error('Interceptor auth error:', err);
+      return next(req);
     })
   );
 };
