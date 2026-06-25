@@ -1,3 +1,4 @@
+from app.services import logger
 import boto3
 import json
 import time
@@ -7,12 +8,7 @@ from app.tasks.image_tasks import process_s3_upload_task
 from app.core.config import settings  
 
 # Setup unbuffered, explicit logging for easier AWS CloudWatch/Docker log viewing
-logging.basicConfig(
-    stream=sys.stdout,
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] [BRIDGE-SCRIPT] %(message)s"
-)
-logger = logging.getLogger(__name__)
+
 
 endpoint_url = (settings.LOCALSTACK_ENDPOINT or "").strip() or None
 

@@ -3,7 +3,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import requests
 from jose import jwt
-
+from app.services import logger
 app = FastAPI()
 security = HTTPBearer()
 
@@ -46,7 +46,7 @@ def verify_cognito_token(
             audience=CLIENT_ID,
             issuer=ISSUER,
         )
-        print("DECODED PAYLOAD:", payload)
+        logger.info(f"DECODED PAYLOAD:{payload}")
         return payload
 
     except Exception:
