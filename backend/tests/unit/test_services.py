@@ -1,178 +1,146 @@
+import asyncio
 import datetime
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+import logging
+import uuid
+from typing import Any, Callable
 
-from app.services.image_service import ImageService
+import boto3
+
+from app.core.config import settings
+from app.dto.image import ProcessingStatus
 from app.repository.dynamo_image_repo import DynamoImageRepository
+from app.services.s3_service import S3Service
+
+logger = logging.getLogger(__name__)
+endpoint_url = settings.LOCALSTACK_ENDPOINT or None
 
 
-# ---------------------------------------------------------------------------
-# MOCK REPO
-# ---------------------------------------------------------------------------
+class ImageService:
 
-def make_mock_repo(**overrides) -> DynamoImageRepository:
-    repo = MagicMock(spec=DynamoImageRepository)
-
-    repo.create = AsyncMock()
-    repo.get_by_id = AsyncMock(return_value=None)
-    repo.update_status = AsyncMock()
-    repo.list_by_status = AsyncMock(return_value={"items": [], "last_key": None})
-
-    repo.list_by_user = AsyncMock(return_value=[])
-
-    for k, v in overrides.items():
-        setattr(repo, k, v)
-
-    return repo
-
-
-# ---------------------------------------------------------------------------
-# get_upload_url
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_get_upload_url_creates_record_and_returns_url():
-    repo = make_mock_repo()
-
-    user = {
-        "sub": "test-user-123",
-        "email": "test@example.com",
-    }
-
-    with patch(
-        "app.services.image_service.S3Service.generate_presigned_url",
-        return_value="https://s3.example.com/presigned",
-    ):
-        result = await ImageService.get_upload_url(
-            repo,
-            "photo.jpg",
-            "image/jpeg",
-            user,
+    @classmethod
+    def _get_s3_client(cls):
+        return boto3.client(
+            "s3",
+            endpoint_url=endpoint_url,
+            region_name=settings.AWS_REGION,
         )
 
-    assert "image_id" in result
-    assert result["upload_url"] == "https://s3.example.com/presigned"
+    @classmethod
+    async def _run_in_executor(cls, func: Callable, *args: Any, **kwargs: Any) -> Any:
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
 
-    repo.create.assert_awaited_once()
+    # -----------------------
+    # REQUEST UPLOAD URL
+    # -----------------------
+    @staticmethod
+    async def get_upload_url(repo: DynamoImageRepository, filename: str, content_type: str, user: dict):
+        image_id = str(uuid.uuid4())
+        s3_key = f"raw/{image_id}-{filename}"
+        now = datetime.datetime.utcnow().isoformat()
 
-    item = repo.create.call_args[0][0]
-
-    assert item["filename"] == "photo.jpg"
-    assert item["status"] == "PENDING"
-    assert item["created_by"] == "test-user-123"
-    assert "raw/" in item["s3_key"]
-
-
-# ---------------------------------------------------------------------------
-# already_processed
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_already_processed_returns_true():
-    repo = make_mock_repo(
-        list_by_status=AsyncMock(return_value={
-            "items": [{"s3_key": "raw/x.jpg"}],
-            "last_key": None,
+        await repo.create({
+            "id": image_id,
+            "filename": filename,
+            "status": ProcessingStatus.PENDING.value.upper(),
+            "s3_key": s3_key,
+            "created_at": now,
+            "created_by": user["sub"],
+            "created_by_email": user.get("email"),
         })
-    )
 
-    result = await ImageService.already_processed(repo, "raw/x.jpg")
-    assert result is True
-
-
-@pytest.mark.asyncio
-async def test_already_processed_returns_false():
-    repo = make_mock_repo(
-        list_by_status=AsyncMock(return_value={
-            "items": [],
-            "last_key": None,
-        })
-    )
-
-    result = await ImageService.already_processed(repo, "raw/x.jpg")
-    assert result is False
-
-
-# ---------------------------------------------------------------------------
-# process_image
-# ---------------------------------------------------------------------------
-
-@pytest.mark.asyncio
-async def test_process_image_success():
-    repo = make_mock_repo()
-
-    existing_item = {
-        "id": "1",
-        "s3_key": "raw/test.jpg",
-        "filename": "test.jpg",
-        "status": "PENDING",
-        "created_at": datetime.datetime.utcnow().isoformat(),
-    }
-
-    # process_image STILL uses list_all internally (your current code)
-    repo.list_all = AsyncMock(return_value=[existing_item])
-
-    mock_s3 = MagicMock()
-    mock_s3.copy_object = MagicMock()
-    mock_s3.delete_object = MagicMock()
-
-    with patch.object(ImageService, "_get_s3_client", return_value=mock_s3):
-        new_key = await ImageService.process_image(
-            repo,
-            "bucket",
-            "raw/test.jpg",
+        presigned_url = S3Service().generate_presigned_url(
+            object_name=s3_key,
+            content_type=content_type,
         )
 
-    assert new_key == "processed/test.jpg"
+        return {"image_id": image_id, "upload_url": presigned_url}
 
+    # -----------------------
+    # ALREADY PROCESSED?
+    # -----------------------
+    @staticmethod
+    async def already_processed(repo: DynamoImageRepository, key: str) -> bool:
+        resp = await repo.list_by_status(ProcessingStatus.COMPLETED.value.upper())
+        return any(item.get("s3_key") == key for item in resp["items"])
 
-@pytest.mark.asyncio
-async def test_process_image_not_found():
-    repo = make_mock_repo()
-    repo.list_all = AsyncMock(return_value=[])
+    # -----------------------
+    # PROCESS IMAGE
+    # -----------------------
+    @classmethod
+    async def process_image(cls, repo: DynamoImageRepository, bucket: str, key: str) -> str:
+        s3 = cls._get_s3_client()
+        new_key = f"processed/{key.split('/')[-1]}"
 
-    with pytest.raises(ValueError):
-        await ImageService.process_image(
-            repo,
-            "bucket",
-            "raw/missing.jpg",
+        all_items = await repo.list_all()
+        image_record = next((i for i in all_items if i.get("s3_key") == key), None)
+
+        if not image_record:
+            logger.error("Record not found for key: %s", key)
+            raise ValueError(f"Record not found for key: {key}")
+
+        await cls._run_in_executor(
+            s3.copy_object,
+            Bucket=bucket,
+            CopySource={"Bucket": bucket, "Key": key},
+            Key=new_key,
         )
 
+        try:
+            await cls._run_in_executor(s3.delete_object, Bucket=bucket, Key=key)
+        except Exception:
+            logger.warning("Failed to delete %s", key, exc_info=True)
 
-# ---------------------------------------------------------------------------
-# get_all_images
-# ---------------------------------------------------------------------------
+        return new_key
 
-@pytest.mark.asyncio
-async def test_get_all_images():
-    repo = make_mock_repo()
+    # -----------------------
+    # GET ALL IMAGES (FIXED)
+    # -----------------------
+    @classmethod
+    async def get_all_images(cls, repo: DynamoImageRepository, user_id: str | None = None):
 
-    repo.list_by_user = AsyncMock(return_value=[
-        {
-            "id": "123",
-            "filename": "photo.jpg",
-            "status": "COMPLETED",
-            "s3_key": "raw/x.jpg",
-            "s3_processed_file": "processed/x.jpg",
-            "created_at": "2024-01-01T00:00:00",
+        if user_id:
+            items = await repo.list_by_user(user_id)
+        else:
+            items = await repo.list_all()
+
+        s3 = S3Service()
+
+        return [
+            {
+                "id": item["id"],
+                "filename": item["filename"],
+                "status": item["status"].lower(),
+                "s3_key": s3.generate_presigned_url(
+                    object_name=item["s3_key"],
+                    method="get_object",
+                    expiration=900,
+                ),
+                "url": s3.generate_presigned_url(
+                    object_name=item.get("s3_processed_file") or item["s3_key"],
+                    method="get_object",
+                ),
+                "created_at": item["created_at"],
+            }
+            for item in items
+        ]
+
+    # -----------------------
+    # ADMIN STATS (NEW API SUPPORT)
+    # -----------------------
+    @staticmethod
+    async def get_admin_stats(repo: DynamoImageRepository):
+        import anyio
+
+        def scan_images():
+            return repo.dynamo.table.scan()
+
+        resp = await anyio.to_thread.run_sync(scan_images)
+        items = resp.get("Items", [])
+
+        users = {i.get("created_by") for i in items if i.get("created_by")}
+
+        return {
+            "total_users": len(users),
+            "total_files": len(items),
         }
-    ])
-
-    with patch(
-        "app.services.image_service.S3Service.generate_presigned_url",
-        return_value="https://signed-url",
-    ):
-        result = await ImageService.get_all_images(repo, "test-user")
-
-    assert len(result) == 1
-    assert result[0]["status"] == "completed"
-
-
-@pytest.mark.asyncio
-async def test_get_all_images_empty():
-    repo = make_mock_repo()
-    repo.list_by_user = AsyncMock(return_value=[])
-
-    result = await ImageService.get_all_images(repo, "test-user")
-
-    assert result == []

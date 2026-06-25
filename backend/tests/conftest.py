@@ -6,6 +6,7 @@ from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.deps import get_image_repo
 from app.repository.dynamo_image_repo import DynamoImageRepository
+from app.services.cognito import verify_cognito_token
 
 
 def make_mock_repo() -> DynamoImageRepository:
@@ -16,22 +17,15 @@ def make_mock_repo() -> DynamoImageRepository:
     repo.update_status = AsyncMock()
     repo.list_by_status = AsyncMock(return_value={"items": [], "last_key": None})
     repo.list_all = AsyncMock(return_value=[])
+    repo.list_by_user = AsyncMock(return_value=[])
 
     return repo
 
-
-# -----------------------
-# FIXED MOCK REPO
-# -----------------------
 
 @pytest.fixture
 def mock_repo():
     return make_mock_repo()
 
-
-# -----------------------
-# FIXED CLIENT
-# -----------------------
 
 @pytest_asyncio.fixture
 async def client(mock_repo):
@@ -43,4 +37,16 @@ async def client(mock_repo):
     ) as ac:
         yield ac
 
+    app.dependency_overrides.clear()
+
+
+@pytest.fixture(autouse=True)
+def override_auth():
+    app.dependency_overrides[verify_cognito_token] = lambda: {
+        "sub": "test-user-123",
+        "email": "test@example.com",
+        "cognito:groups": ["Admin"],
+    }
+
+    yield
     app.dependency_overrides.clear()
