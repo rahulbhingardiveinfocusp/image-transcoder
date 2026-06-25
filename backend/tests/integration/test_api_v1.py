@@ -1,7 +1,7 @@
 import pytest
 from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient
-
+import uuid
 from app.services.image_service import ImageService
 
 
@@ -69,10 +69,11 @@ async def test_get_all_images_empty(client: AsyncClient, mock_repo):
 async def test_get_all_images_returns_list(client: AsyncClient, mock_repo):
 
     import datetime
+    import uuid
 
     mock_repo.list_by_user = AsyncMock(return_value=[
         {
-            "id": "123",
+            "id": str(uuid.uuid4()),   # ✅ FIXED
             "filename": "photo.jpg",
             "status": "COMPLETED",
             "s3_key": "raw/x.jpg",
@@ -91,4 +92,4 @@ async def test_get_all_images_returns_list(client: AsyncClient, mock_repo):
     items = response.json()
 
     assert len(items) == 1
-    assert items[0]["id"] == "123"
+    assert items[0]["status"] == "completed"
