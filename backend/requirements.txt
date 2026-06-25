@@ -84,3 +84,4 @@ websockets==16.0
 gevent
 pycurl
 jose
+requests==2.32.3
