@@ -46,7 +46,7 @@ def verify_cognito_token(
             audience=CLIENT_ID,
             issuer=ISSUER,
         )
-
+        print("DECODED PAYLOAD:", payload)
         return payload
 
     except Exception:
