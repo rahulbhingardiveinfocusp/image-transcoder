@@ -34,7 +34,7 @@ class ImageService:
     # REQUEST UPLOAD URL
     # -----------------------
     @staticmethod
-    async def get_upload_url(repo: DynamoImageRepository, filename: str, content_type: str,user:dict):
+    async def get_upload_url(repo: DynamoImageRepository, filename: str, content_type: str, user:dict):
         image_id = str(uuid.uuid4())
         s3_key = f"raw/{image_id}-{filename}"
         now = datetime.datetime.utcnow().isoformat()
