@@ -3,23 +3,27 @@ import {
   provideBrowserGlobalErrorListeners
 } from '@angular/core';
 
+import { provideRouter } from '@angular/router';
+
 import {
-  provideRouter
-} from '@angular/router';
-
-
+  provideHttpClient,
+  withInterceptors
+} from '@angular/common/http';
 
 import { routes } from './app.routes';
 import { environment } from '../environments/environment';
+import { authInterceptor } from './auth.interceptor';
+
 
 export const appConfig: ApplicationConfig = {
-
   providers: [
-
     provideBrowserGlobalErrorListeners(),
 
     provideRouter(routes),
 
+    provideHttpClient(
+      withInterceptors([authInterceptor])
+    ),
   ]
 };
 
@@ -28,7 +32,7 @@ export const awsConfig = {
     Cognito: {
       userPoolId: environment.cognitoUserPoolId,
       userPoolClientId: environment.cognitoClientId,
-      region: environment.cognitoRegion,    
+      region: environment.cognitoRegion,
       loginWith: {
         email: true
       }

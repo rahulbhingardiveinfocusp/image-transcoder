@@ -1,6 +1,6 @@
-from fastapi import FastAPI
+from app.services.cognito import verify_cognito_token
+from fastapi import FastAPI,Depends
 from fastapi.middleware.cors import CORSMiddleware
-
 from app.core.config import settings
 from app.api.v1.router import router as v1_router
 
@@ -24,4 +24,4 @@ def health():
     return {"status": "ok"}
 
 
-app.include_router(v1_router, prefix="/api/v1", tags=["images"])
+app.include_router(v1_router, prefix="/api/v1", tags=["images"], dependencies=[Depends(verify_cognito_token)])

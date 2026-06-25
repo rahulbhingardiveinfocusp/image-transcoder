@@ -95,3 +95,20 @@ class DynamoImageRepository:
         # sort descending by created_at (mirrors the old ORDER BY created_at DESC)
         items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
         return items
+    
+    async def list_by_user(self, user_id: str) -> List[Dict[str, Any]]:
+        import anyio
+
+        resp = await anyio.to_thread.run_sync(
+            lambda: self.dynamo.table.scan(
+                FilterExpression="SK = :sk AND created_by = :user_id",
+                ExpressionAttributeValues={
+                    ":sk": "METADATA",
+                    ":user_id": user_id,
+                },
+            )
+        )
+
+        items = resp.get("Items", [])
+        items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
+        return items

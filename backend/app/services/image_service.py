@@ -34,7 +34,7 @@ class ImageService:
     # REQUEST UPLOAD URL
     # -----------------------
     @staticmethod
-    async def get_upload_url(repo: DynamoImageRepository, filename: str, content_type: str):
+    async def get_upload_url(repo: DynamoImageRepository, filename: str, content_type: str,user:dict):
         image_id = str(uuid.uuid4())
         s3_key = f"raw/{image_id}-{filename}"
         now = datetime.datetime.utcnow().isoformat()
@@ -42,9 +42,11 @@ class ImageService:
         await repo.create({
             "id": image_id,
             "filename": filename,
-            "status": ProcessingStatus.PENDING.value.upper(),   # stored as "PENDING" in Dynamo
+            "status": ProcessingStatus.PENDING.value.upper(),  
             "s3_key": s3_key,
             "created_at": now,
+            "created_by": user["sub"],
+            "created_by_email": user.get("email"),
         })
 
         presigned_url = S3Service().generate_presigned_url(
@@ -114,15 +116,19 @@ class ImageService:
     # GET ALL IMAGES
     # -----------------------
     @classmethod
-    async def get_all_images(cls, repo: DynamoImageRepository):
-        items = await repo.list_all()
+    async def get_all_images(
+        cls,
+        repo: DynamoImageRepository,
+        user_id: str,
+    ):
+        items = await repo.list_by_user(user_id)
         s3 = S3Service()
 
         return [
             {
                 "id": item["id"],
                 "filename": item["filename"],
-                "status": item["status"].lower(),          # back to lowercase for the DTO enum
+                "status": item["status"].lower(),
                 "s3_key": s3.generate_presigned_url(
                     object_name=item["s3_key"],
                     method="get_object",
@@ -136,3 +142,27 @@ class ImageService:
             }
             for item in items
         ]
+    @staticmethod
+    async def get_admin_stats(repo: DynamoImageRepository):
+        import anyio
+
+        def scan_images():
+            return repo.dynamo.table.scan()
+
+        resp = await anyio.to_thread.run_sync(scan_images)
+
+        items = resp.get("Items", [])
+
+        total_files = len(items)
+
+        # extract unique users
+        users = set()
+
+        for item in items:
+            if "created_by" in item:
+                users.add(item["created_by"])
+
+        return {
+            "total_users": len(users),
+            "total_files": total_files
+        }

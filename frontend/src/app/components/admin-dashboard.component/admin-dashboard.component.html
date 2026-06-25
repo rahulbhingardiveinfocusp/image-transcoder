@@ -1,2 +1,147 @@
-<p>admin-dashboard.component works!</p>
-<button (click)="logout()">Logout</button>
+<div class="dashboard">
+
+    <!-- HEADER -->
+    <div class="header-card">
+
+        <div class="header-left">
+
+            <div class="title-row">
+                <div class="logo-badge">🛡️</div>
+
+                <div>
+                    <h1>Admin Dashboard</h1>
+                    <p>Manage users and uploaded files</p>
+                </div>
+
+            </div>
+
+        </div>
+
+        <button class="btn ghost" (click)="logout()">
+            Logout
+        </button>
+
+    </div>
+
+    <!-- STATS -->
+
+    <div class="stats-grid">
+
+        <div class="card stat-card">
+            <div class="stat-title">Total Users</div>
+            <div class="stat-value">
+                {{ stats.total_users }}
+            </div>
+        </div>
+
+        <div class="card stat-card">
+            <div class="stat-title">Total Files</div>
+            <div class="stat-value">
+                {{ stats.total_files }}
+            </div>
+        </div>
+
+    </div>
+
+    <!-- USERS -->
+
+    <div class="card">
+
+        <div class="toolbar">
+
+            <input type="text" placeholder="Search users..." [(ngModel)]="searchTerm">
+
+        </div>
+
+        <table class="table">
+
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Files</th>
+                    <th>Last Upload</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                <tr *ngFor="let user of filteredUsers">
+
+                    <td>{{ user.email }}</td>
+
+                    <td>
+                        <span class="badge badge-success">
+                            {{ user.files_count }}
+                        </span>
+                    </td>
+
+                    <td>
+                        {{ user.last_upload | date:'medium' }}
+                    </td>
+
+                    <td>
+                    <td>
+                        <button class="btn primary" (click)="viewFiles(user)">
+                            View Files
+                        </button>
+                    </td>
+
+
+                </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <!-- FILES SECTION -->
+
+    <div *ngIf="selectedUser" class="card">
+
+        <h3>
+            Files uploaded by
+            {{ selectedUser.email }}
+        </h3>
+
+        <table class="table">
+
+            <thead>
+                <tr>
+                    <th>Preview</th>
+                    <th>Filename</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                </tr>
+            </thead>
+
+            <tbody>
+
+                <tr *ngFor="let file of userFiles">
+
+                    <td>
+                        <img class="processe-file" [src]="file.url">
+                    </td>
+
+                    <td>{{ file.filename }}</td>
+
+                    <td>
+                        <span class="badge">
+                            {{ file.status }}
+                        </span>
+                    </td>
+
+                    <td>
+                        {{ file.created_at | date:'medium' }}
+                    </td>
+
+                </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</div>

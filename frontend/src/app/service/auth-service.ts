@@ -72,6 +72,6 @@ export class AuthService {
 
   async getJwt() {
     const session = await fetchAuthSession();
-    return session.tokens?.accessToken?.toString();
+    return session.tokens?.idToken?.toString();
   }
 }
