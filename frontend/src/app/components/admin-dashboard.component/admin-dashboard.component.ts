@@ -2,7 +2,7 @@ import { ChangeDetectorRef, Component } from '@angular/core';
 import { AuthService } from '../../service/auth-service';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 export interface AdminStats {
   total_users: number;
@@ -27,7 +27,7 @@ export interface UserFile {
 @Component({
   selector: 'app-admin-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, HttpClientModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './admin-dashboard.component.html',
   styleUrls: ['./admin-dashboard.component.css']
 })
@@ -53,7 +53,7 @@ export class AdminDashboardComponent {
   private http: HttpClient,
   private router: Router,
   private auth: AuthService,
-  private cdr: ChangeDetectorRef
+  private cdr: ChangeDetectorRef,
   ) {}
 
   ngOnInit(): void {

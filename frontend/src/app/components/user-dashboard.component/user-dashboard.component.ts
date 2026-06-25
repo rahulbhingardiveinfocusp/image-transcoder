@@ -10,10 +10,11 @@ import {
 
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient, HttpClientModule } from '@angular/common/http';
+
 import { interval, Subject, takeUntil } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthService } from '../../service/auth-service';
+import { HttpClient } from '@angular/common/http';
 
 type PreSignedResponse = {
   image_id: string;
@@ -32,7 +33,7 @@ type ImageItem = {
 
 @Component({
   selector: 'app-user-dashboard.component',
-  imports: [CommonModule, FormsModule, HttpClientModule],
+  imports: [CommonModule, FormsModule],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './user-dashboard.component.html',
   styleUrl: './user-dashboard.component.css',
