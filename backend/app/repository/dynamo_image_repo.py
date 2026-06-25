@@ -16,17 +16,14 @@ class DynamoImageRepository:
         item = {
             "PK": f"IMAGE#{data['id']}",
             "SK": "METADATA",
-
             "id": str(data["id"]),
             "filename": data["filename"],
             "status": data.get("status", "PENDING"),
-
             "s3_key": data["s3_key"],
             "s3_processed_file": data.get("s3_processed_file"),
-
             "created_at": data["created_at"],
             "created_by": data["created_by"],
-            # GSI for status queries
+            "created_by_email":data["created_by_email"],
             "GSI1PK": f"STATUS#{data.get('status', 'PENDING')}",
             "GSI1SK": data["created_at"],
         }
