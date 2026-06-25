@@ -25,7 +25,7 @@ class DynamoImageRepository:
             "s3_processed_file": data.get("s3_processed_file"),
 
             "created_at": data["created_at"],
-
+            "created_by": data["created_by"],
             # GSI for status queries
             "GSI1PK": f"STATUS#{data.get('status', 'PENDING')}",
             "GSI1SK": data["created_at"],
