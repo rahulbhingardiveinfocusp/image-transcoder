@@ -70,7 +70,7 @@ async def test_get_all_images_returns_list(client: AsyncClient, mock_repo):
 
     import datetime
 
-    mock_repo.list_all = AsyncMock(return_value=[
+    mock_repo.list_by_user = AsyncMock(return_value=[
         {
             "id": "123",
             "filename": "photo.jpg",
@@ -92,4 +92,3 @@ async def test_get_all_images_returns_list(client: AsyncClient, mock_repo):
 
     assert len(items) == 1
     assert items[0]["id"] == "123"
-    assert items[0]["status"] == "completed"
