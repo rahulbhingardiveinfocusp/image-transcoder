@@ -9,10 +9,9 @@ import { AuthService } from './service/auth-service';
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   // Don't send JWT to S3 presigned URLs or external services
-  if (!req.url.startsWith(environment.apiUrl)) {
+  if (!req.url.includes('/api/')) {
     return next(req);
   }
-
   const auth = inject(AuthService);
 
   return from(auth.getJwt()).pipe(
