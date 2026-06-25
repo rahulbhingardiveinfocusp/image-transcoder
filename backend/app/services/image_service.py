@@ -1,4 +1,5 @@
 import asyncio
+from collections import defaultdict
 import datetime
 import logging
 import uuid
@@ -166,3 +167,33 @@ class ImageService:
             "total_users": len(users),
             "total_files": total_files
         }
+    
+    def get_users_summary(self):
+        response = self.table.scan()
+
+        users = defaultdict(lambda: {
+            "user_id": "",
+            "email": "",
+            "files_count": 0,
+            "last_upload": None
+        })
+
+        for item in response.get("Items", []):
+            if item.get("SK") != "METADATA":
+                continue
+
+            user_id = item["created_by"]
+
+            users[user_id]["user_id"] = user_id
+            users[user_id]["email"] = item["created_by_email"]
+            users[user_id]["files_count"] += 1
+
+            created_at = item["created_at"]
+
+            if (
+                users[user_id]["last_upload"] is None
+                or created_at > users[user_id]["last_upload"]
+            ):
+                users[user_id]["last_upload"] = created_at
+
+        return list(users.values())

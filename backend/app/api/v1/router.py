@@ -52,3 +52,6 @@ async def get_admin_stats(
     repo: DynamoImageRepository = Depends(get_image_repo),
 ):
     return await ImageService.get_admin_stats(repo)
+@router.get("/admin/users")
+def get_users( repo: DynamoImageRepository = Depends(get_image_repo),admin: dict = Depends(require_admin)):
+    return ImageService.get_users_summary()
