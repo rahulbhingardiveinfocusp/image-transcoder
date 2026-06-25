@@ -7,30 +7,26 @@ import { AuthService } from './service/auth-service';
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
 
-  const isApi = req.url.includes('/api/');
-
-  if (!isApi) {
-    return next(req);
-  }
+  console.log('🧠 INTERCEPTOR ENTERED:', req.url);
 
   return from(auth.getJwt()).pipe(
     switchMap((token) => {
-      console.log('JWT token in interceptor:', token);
+      console.log('🔐 TOKEN RECEIVED:', token);
 
-      if (!token) {
-        return next(req);
-      }
+      const cloned = token
+        ? req.clone({
+            setHeaders: {
+              Authorization: `Bearer ${token}`,
+            },
+          })
+        : req;
 
-      return next(
-        req.clone({
-          setHeaders: {
-            Authorization: `Bearer ${token}`,
-          },
-        })
-      );
+      console.log('🚀 FINAL HEADERS:', cloned.headers.keys());
+
+      return next(cloned);
     }),
     catchError((err) => {
-      console.error('Interceptor auth error:', err);
+      console.error('💥 INTERCEPTOR ERROR:', err);
       return next(req);
     })
   );
