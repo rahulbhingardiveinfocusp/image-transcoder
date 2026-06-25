@@ -32,16 +32,15 @@ async def get_all_images(
         user["sub"],
     )
 
-@router.get(
-    "/admin/users/{user_id}/files",
-    response_model=list[ImageResponse]
-)
+
+
+@router.get("/admin/users/{user_id}/files")
 async def get_user_files(
     user_id: str,
     admin: dict = Depends(require_admin),
     repo: DynamoImageRepository = Depends(get_image_repo),
 ):
-    return await ImageService.get_user_images(
+    return await ImageService.get_user_files(
         repo,
         user_id
     )
@@ -55,6 +54,8 @@ async def get_admin_stats(
 
 
 @router.get("/admin/users")
-async def get_users( admin: dict = Depends(require_admin),
-    repo: DynamoImageRepository = Depends(get_image_repo),):
-    return ImageService.get_users_summary()
+async def get_users(
+    admin: dict = Depends(require_admin),
+    repo: DynamoImageRepository = Depends(get_image_repo),
+):
+    return await ImageService.get_users_summary(repo)

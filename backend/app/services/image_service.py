@@ -4,6 +4,7 @@ import datetime
 import logging
 import uuid
 from typing import Any, Callable
+from xml.dom.minidom import Attr
 
 import boto3
 
@@ -168,8 +169,14 @@ class ImageService:
             "total_files": total_files
         }
     
-    def get_users_summary(self):
-        response = self.table.scan()
+    @staticmethod
+    async def get_users_summary(repo: DynamoImageRepository):
+        import anyio
+
+        def scan_images():
+            return repo.dynamo.table.scan()
+
+        response = await anyio.to_thread.run_sync(scan_images)
 
         users = defaultdict(lambda: {
             "user_id": "",
@@ -185,7 +192,7 @@ class ImageService:
             user_id = item["created_by"]
 
             users[user_id]["user_id"] = user_id
-            users[user_id]["email"] = item["created_by_email"]
+            users[user_id]["email"] = item.get("created_by_email")
             users[user_id]["files_count"] += 1
 
             created_at = item["created_at"]
@@ -197,3 +204,38 @@ class ImageService:
                 users[user_id]["last_upload"] = created_at
 
         return list(users.values())
+    
+    @staticmethod
+    async def get_user_files(
+        repo: DynamoImageRepository,
+        user_id: str
+    ):
+        import anyio
+        def scan_user_files():
+            return repo.dynamo.table.scan(
+                FilterExpression=Attr("created_by").eq(user_id)
+            )
+
+        response = await anyio.to_thread.run_sync(
+            scan_user_files
+        )
+
+        items = response.get("Items", [])
+
+        s3 = S3Service()
+
+        return [
+            {
+                "id": item["id"],
+                "filename": item["filename"],
+                "status": item["status"],
+                "created_at": item["created_at"],
+                "url": s3.generate_presigned_url(
+                    object_name=item.get("s3_processed_file")
+                    or item["s3_key"],
+                    method="get_object",
+                )
+            }
+            for item in items
+            if item.get("SK") == "METADATA"
+        ]
