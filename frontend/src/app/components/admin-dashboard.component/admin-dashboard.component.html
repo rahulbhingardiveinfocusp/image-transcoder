@@ -2,139 +2,118 @@
 
   <!-- HEADER -->
   <div class="header-card">
-
     <div class="header-left">
-
       <div class="title-row">
         <div class="logo-badge">🛡️</div>
-
         <div>
           <h1>Admin Dashboard</h1>
           <p>Manage users and uploaded files</p>
         </div>
       </div>
-
     </div>
-
     <div class="header-actions">
-      <button class="btn ghost" (click)="logout()">Logout</button>
+      <span class="meta-item"><span class="dot green"></span>Live</span>
+      <button class="btn ghost" (click)="logout()">
+        <i class="ti ti-logout"></i> Logout
+      </button>
     </div>
-
   </div>
 
   <!-- STATS -->
   <div class="stats-grid">
-
     <div class="card stat-card">
       <div class="stat-title">Total Users</div>
       <div class="stat-value">{{ stats.total_users }}</div>
     </div>
-
     <div class="card stat-card">
       <div class="stat-title">Total Files</div>
       <div class="stat-value">{{ stats.total_files }}</div>
     </div>
-
   </div>
 
-  <!-- USERS CARD -->
+  <!-- USERS TABLE -->
   <div class="card">
-
     <div class="toolbar">
-
       <div class="toolbar-left">
-        <input type="text"
-               placeholder="Search users..."
-               [(ngModel)]="searchTerm" />
+        <input type="text" placeholder="Search users..." [(ngModel)]="searchTerm" />
       </div>
-
     </div>
 
     <table class="table">
-
       <thead>
         <tr>
-          <th>Email</th>
+          <th>User</th>
           <th>Files</th>
           <th>Last Upload</th>
           <th>Action</th>
         </tr>
       </thead>
-
       <tbody>
-
-        <tr *ngFor="let user of filteredUsers">
-
+        <tr *ngFor="let user of filteredUsers" (click)="openModal(user)" style="cursor:pointer">
           <td class="filename">{{ user.email }}</td>
-
+          <td><span class="badge badge-success">{{ user.files_count }}</span></td>
+          <td class="date">{{ user.last_upload | date:'medium' }}</td>
           <td>
-            <span class="badge badge-success">
-              {{ user.files_count }}
-            </span>
-          </td>
-
-          <td class="date">
-            {{ user.last_upload | date:'medium' }}
-          </td>
-
-          <td class="actions">
-            <button class="btn primary" (click)="viewFiles(user)">
+            <button class="btn primary" (click)="openModal(user); $event.stopPropagation()">
               View Files
             </button>
           </td>
-
         </tr>
-
+        <tr *ngIf="filteredUsers.length === 0">
+          <td colspan="4" class="empty">No users found</td>
+        </tr>
       </tbody>
-
     </table>
-
   </div>
 
-  <!-- FILES SECTION -->
-  <div *ngIf="selectedUser" class="card">
+  <!-- FILES MODAL OVERLAY -->
+  <div class="modal-overlay" *ngIf="selectedUser" (click)="closeModal()">
+    <div class="modal" (click)="$event.stopPropagation()">
 
-    <div class="header-actions">
-      <h3>Files uploaded by {{ selectedUser.email }}</h3>
+      <div class="modal-header">
+        <div class="modal-title-row">
+          <div class="logo-badge" style="font-size:14px">📁</div>
+          <div>
+            <h3>{{ selectedUser.email }}</h3>
+            <p>{{ userFiles.length }} file(s) uploaded</p>
+          </div>
+        </div>
+        <button class="modal-close" (click)="closeModal()">✕</button>
+      </div>
+
+      <div class="modal-body">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Preview</th>
+              <th>Filename</th>
+              <th>Status</th>
+              <th>Created</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let file of userFiles">
+              <td><img class="processe-file" [src]="file.url" [alt]="file.filename" /></td>
+              <td class="filename">{{ file.filename }}</td>
+              <td>
+                <span class="badge" [ngClass]="getStatusClass(file.status)">
+                  {{ file.status }}
+                </span>
+              </td>
+              <td class="date">{{ file.created_at | date:'medium' }}</td>
+            </tr>
+            <tr *ngIf="userFiles.length === 0">
+              <td colspan="4" class="empty">No files found</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn ghost" (click)="closeModal()">Close</button>
+      </div>
+
     </div>
-
-    <table class="table">
-
-      <thead>
-        <tr>
-          <th>Preview</th>
-          <th>Filename</th>
-          <th>Status</th>
-          <th>Created</th>
-        </tr>
-      </thead>
-
-      <tbody>
-
-        <tr *ngFor="let file of userFiles">
-
-          <td>
-            <img class="processe-file" [src]="file.url" />
-          </td>
-
-          <td class="filename">{{ file.filename }}</td>
-
-          <td>
-            <span class="badge" [ngClass]="file.status">
-              {{ file.status }}
-            </span>
-          </td>
-
-          <td class="date">
-            {{ file.created_at | date:'medium' }}
-          </td>
-
-        </tr>
-
-      </tbody>
-
-    </table>
-
   </div>
 
 </div>

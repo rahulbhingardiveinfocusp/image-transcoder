@@ -73,7 +73,6 @@
           <th (click)="sort('filename')">Filename</th>
           <th>Status</th>
           <th (click)="sort('created_at')">Created</th>
-          <th>Action</th>
         </tr>
       </thead>
 
@@ -94,23 +93,6 @@
 
           <td class="date">
             {{ img.created_at | date:'medium' }}
-          </td>
-          <td class="actions">
-            <div class="action-menu">
-              <button class="btn ghost">
-                Share ▼
-              </button>
-
-              <div class="dropdown">
-                <button (click)="shareOriginal(img)">
-                  Share Original
-                </button>
-
-                <button (click)="shareProcessed(img)">
-                  Share Processed
-                </button>
-              </div>
-            </div>
           </td>
         </tr>
 
