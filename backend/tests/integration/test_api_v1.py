@@ -5,6 +5,9 @@ from httpx import AsyncClient
 from app.services.cognito import verify_cognito_token
 
 
+from app.services.cognito import verify_cognito_token
+
+
 # ---------------------------------------------------------------------------
 # AUTH OVERRIDE (IMPORTANT)
 # ---------------------------------------------------------------------------
@@ -21,11 +24,18 @@ def override_verify_cognito_token():
 # FIXTURE: APPLY AUTH OVERRIDE
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture(autouse=True)
-def override_auth(app):
-    app.dependency_overrides[verify_cognito_token] = override_verify_cognito_token
+def override_auth(client):
+    client.app.dependency_overrides[verify_cognito_token] = lambda: {
+        "sub": "test-user-123",
+        "email": "test@example.com",
+        "cognito:groups": ["Admin"],
+    }
+
     yield
-    app.dependency_overrides.clear()
+
+    client.app.dependency_overrides.clear()
 
 
 # ---------------------------------------------------------------------------
