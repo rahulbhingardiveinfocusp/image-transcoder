@@ -1,147 +1,140 @@
 <div class="dashboard">
 
-    <!-- HEADER -->
-    <div class="header-card">
+  <!-- HEADER -->
+  <div class="header-card">
 
-        <div class="header-left">
+    <div class="header-left">
 
-            <div class="title-row">
-                <div class="logo-badge">🛡️</div>
+      <div class="title-row">
+        <div class="logo-badge">🛡️</div>
 
-                <div>
-                    <h1>Admin Dashboard</h1>
-                    <p>Manage users and uploaded files</p>
-                </div>
-
-            </div>
-
+        <div>
+          <h1>Admin Dashboard</h1>
+          <p>Manage users and uploaded files</p>
         </div>
-
-        <button class="btn ghost" (click)="logout()">
-            Logout
-        </button>
+      </div>
 
     </div>
 
-    <!-- STATS -->
+    <div class="header-actions">
+      <button class="btn ghost" (click)="logout()">Logout</button>
+    </div>
 
-    <div class="stats-grid">
+  </div>
 
-        <div class="card stat-card">
-            <div class="stat-title">Total Users</div>
-            <div class="stat-value">
-                {{ stats.total_users }}
-            </div>
-        </div>
+  <!-- STATS -->
+  <div class="stats-grid">
 
-        <div class="card stat-card">
-            <div class="stat-title">Total Files</div>
-            <div class="stat-value">
-                {{ stats.total_files }}
-            </div>
-        </div>
+    <div class="card stat-card">
+      <div class="stat-title">Total Users</div>
+      <div class="stat-value">{{ stats.total_users }}</div>
+    </div>
+
+    <div class="card stat-card">
+      <div class="stat-title">Total Files</div>
+      <div class="stat-value">{{ stats.total_files }}</div>
+    </div>
+
+  </div>
+
+  <!-- USERS CARD -->
+  <div class="card">
+
+    <div class="toolbar">
+
+      <div class="toolbar-left">
+        <input type="text"
+               placeholder="Search users..."
+               [(ngModel)]="searchTerm" />
+      </div>
 
     </div>
 
-    <!-- USERS -->
+    <table class="table">
 
-    <div class="card">
+      <thead>
+        <tr>
+          <th>Email</th>
+          <th>Files</th>
+          <th>Last Upload</th>
+          <th>Action</th>
+        </tr>
+      </thead>
 
-        <div class="toolbar">
+      <tbody>
 
-            <input type="text" placeholder="Search users..." [(ngModel)]="searchTerm">
+        <tr *ngFor="let user of filteredUsers">
 
-        </div>
+          <td class="filename">{{ user.email }}</td>
 
-        <table class="table">
+          <td>
+            <span class="badge badge-success">
+              {{ user.files_count }}
+            </span>
+          </td>
 
-            <thead>
-                <tr>
-                    <th>Email</th>
-                    <th>Files</th>
-                    <th>Last Upload</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
+          <td class="date">
+            {{ user.last_upload | date:'medium' }}
+          </td>
 
-            <tbody>
+          <td class="actions">
+            <button class="btn primary" (click)="viewFiles(user)">
+              View Files
+            </button>
+          </td>
 
-                <tr *ngFor="let user of filteredUsers">
+        </tr>
 
-                    <td>{{ user.email }}</td>
+      </tbody>
 
-                    <td>
-                        <span class="badge badge-success">
-                            {{ user.files_count }}
-                        </span>
-                    </td>
+    </table>
 
-                    <td>
-                        {{ user.last_upload | date:'medium' }}
-                    </td>
+  </div>
 
-                    <td>
-                    <td>
-                        <button class="btn primary" (click)="viewFiles(user)">
-                            View Files
-                        </button>
-                    </td>
+  <!-- FILES SECTION -->
+  <div *ngIf="selectedUser" class="card">
 
-
-                </tr>
-
-            </tbody>
-
-        </table>
-
+    <div class="header-actions">
+      <h3>Files uploaded by {{ selectedUser.email }}</h3>
     </div>
 
-    <!-- FILES SECTION -->
+    <table class="table">
 
-    <div *ngIf="selectedUser" class="card">
+      <thead>
+        <tr>
+          <th>Preview</th>
+          <th>Filename</th>
+          <th>Status</th>
+          <th>Created</th>
+        </tr>
+      </thead>
 
-        <h3>
-            Files uploaded by
-            {{ selectedUser.email }}
-        </h3>
+      <tbody>
 
-        <table class="table">
+        <tr *ngFor="let file of userFiles">
 
-            <thead>
-                <tr>
-                    <th>Preview</th>
-                    <th>Filename</th>
-                    <th>Status</th>
-                    <th>Created</th>
-                </tr>
-            </thead>
+          <td>
+            <img class="processe-file" [src]="file.url" />
+          </td>
 
-            <tbody>
+          <td class="filename">{{ file.filename }}</td>
 
-                <tr *ngFor="let file of userFiles">
+          <td>
+            <span class="badge" [ngClass]="file.status">
+              {{ file.status }}
+            </span>
+          </td>
 
-                    <td>
-                        <img class="processe-file" [src]="file.url">
-                    </td>
+          <td class="date">
+            {{ file.created_at | date:'medium' }}
+          </td>
 
-                    <td>{{ file.filename }}</td>
+        </tr>
 
-                    <td>
-                        <span class="badge">
-                            {{ file.status }}
-                        </span>
-                    </td>
+      </tbody>
 
-                    <td>
-                        {{ file.created_at | date:'medium' }}
-                    </td>
+    </table>
 
-                </tr>
-
-            </tbody>
-
-        </table>
-
-    </div>
+  </div>
 
 </div>
