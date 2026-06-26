@@ -58,9 +58,11 @@ login() {
       })
       .catch((err: any) => {
         this.error = err?.message;
-         this.cdr.detectChanges(); 
+        this.cdr.detectChanges(); 
       })
-      .finally(() => (this.loading = false));
+      .finally(() => {this.loading = false;
+        this.cdr.detectChanges(); 
+      });
   }
   signup() {
     this.error = '';
@@ -76,8 +78,11 @@ login() {
       .catch((err: any) => {
         this.showConfirmation = false;
         this.error = err?.message || 'Signup failed';
+        this.cdr.detectChanges(); 
       })
-      .finally(() => (this.loading = false));
+      .finally(() => {this.loading = false;
+        this.cdr.detectChanges(); 
+      });
   }
 
   confirmSignup() {
@@ -93,8 +98,11 @@ login() {
       })
       .catch((err: any) => {
         this.error = err?.message || 'Verification failed';
+         this.cdr.detectChanges(); 
       })
-      .finally(() => (this.loading = false));
+      .finally(() => {this.loading = false;
+        this.cdr.detectChanges(); 
+      });
   }
 
   resendCode() {
@@ -108,7 +116,10 @@ login() {
       })
       .catch((err: any) => {
         this.error = err?.message || 'Failed to resend code';
+         this.cdr.detectChanges(); 
       })
-      .finally(() => (this.loading = false));
+       .finally(() => {this.loading = false;
+        this.cdr.detectChanges(); 
+      });
   }
 }
