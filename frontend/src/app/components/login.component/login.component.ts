@@ -43,10 +43,11 @@ login() {
       console.log('ERROR:', err);
 
       this.error = err?.message || 'Login failed';
-       this.cdr.detectChanges(); 
+      
     })
     .finally(() => {
-      this.loading = false;
+      this.loading = false; 
+      this.cdr.detectChanges(); 
     });
 }
 
@@ -58,7 +59,6 @@ login() {
       })
       .catch((err: any) => {
         this.error = err?.message;
-        this.cdr.detectChanges(); 
       })
       .finally(() => {this.loading = false;
         this.cdr.detectChanges(); 
@@ -78,7 +78,6 @@ login() {
       .catch((err: any) => {
         this.showConfirmation = false;
         this.error = err?.message || 'Signup failed';
-        this.cdr.detectChanges(); 
       })
       .finally(() => {this.loading = false;
         this.cdr.detectChanges(); 
@@ -98,7 +97,6 @@ login() {
       })
       .catch((err: any) => {
         this.error = err?.message || 'Verification failed';
-         this.cdr.detectChanges(); 
       })
       .finally(() => {this.loading = false;
         this.cdr.detectChanges(); 
@@ -116,7 +114,6 @@ login() {
       })
       .catch((err: any) => {
         this.error = err?.message || 'Failed to resend code';
-         this.cdr.detectChanges(); 
       })
        .finally(() => {this.loading = false;
         this.cdr.detectChanges(); 
