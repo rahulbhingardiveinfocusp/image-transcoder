@@ -25,81 +25,78 @@ export class LoginComponent {
 
   constructor(
     private auth: AuthService,
-    private router: Router,
+    private router: Router
   ) {}
 
-  async login() {
+  login() {
     this.error = '';
     this.success = '';
     this.loading = true;
 
-    try {
-      await this.auth.login(this.email, this.password);
-
-      const isAdmin = await this.auth.isAdmin();
-      this.router.navigate([isAdmin ? '/admin' : '/user']);
-    } catch (err: any) {
-      if (err?.name === 'UserNotConfirmedException') {
-        this.showConfirmation = true;
-        this.success = 'Please verify your account first';
-      } else {
-        this.error = err?.message || 'Login failed';
-      }
-    } finally {
-      this.loading = false;
-    }
+    this.auth
+      .login(this.email, this.password)
+      .then(() => this.auth.isAdmin())
+      .then((isAdmin) => {
+        this.router.navigate([isAdmin ? '/admin' : '/user']);
+      })
+      .catch((err: any) => {
+        if (err?.name === 'UserNotConfirmedException') {
+          this.showConfirmation = true;
+          this.success = 'Please verify your account first';
+        } else {
+          this.error = err?.message || 'Login failed';
+        }
+      })
+      .finally(() => (this.loading = false));
   }
 
-  async signup() {
+  signup() {
     this.error = '';
     this.success = '';
     this.loading = true;
-
-    // 🔥 ALWAYS switch UI first
     this.showConfirmation = true;
 
-    try {
-      await this.auth.signUp(this.email, this.password);
-      this.success = 'Verification code sent to email';
-    } catch (err: any) {
-      this.showConfirmation = false;
-      this.error = err?.message || 'Signup failed';
-    } finally {
-      this.loading = false;
-    }
+    this.auth
+      .signUp(this.email, this.password)
+      .then(() => {
+        this.success = 'Verification code sent to email';
+      })
+      .catch((err: any) => {
+        this.showConfirmation = false;
+        this.error = err?.message || 'Signup failed';
+      })
+      .finally(() => (this.loading = false));
   }
 
-  async confirmSignup() {
+  confirmSignup() {
     this.error = '';
     this.loading = true;
 
-    try {
-      await this.auth.confirm(this.email, this.verificationCode);
-
-      // auto login after confirmation
-      await this.auth.login(this.email, this.password);
-
-      const isAdmin = await this.auth.isAdmin();
-      this.router.navigate([isAdmin ? '/admin' : '/user']);
-    } catch (err: any) {
-      this.error = err?.message || 'Verification failed';
-    } finally {
-      this.loading = false;
-    }
+    this.auth
+      .confirm(this.email, this.verificationCode)
+      .then(() => this.auth.login(this.email, this.password))
+      .then(() => this.auth.isAdmin())
+      .then((isAdmin) => {
+        this.router.navigate([isAdmin ? '/admin' : '/user']);
+      })
+      .catch((err: any) => {
+        this.error = err?.message || 'Verification failed';
+      })
+      .finally(() => (this.loading = false));
   }
 
-  async resendCode() {
+  resendCode() {
     this.error = '';
     this.success = '';
     this.loading = true;
 
-    try {
-      await resendSignUpCode({ username: this.email });
-      this.success = 'A new code has been sent to your email.';
-    } catch (err: any) {
-      this.error = err?.message || 'Failed to resend code';
-    } finally {
-      this.loading = false;
-    }
+    resendSignUpCode({ username: this.email })
+      .then(() => {
+        this.success = 'A new code has been sent to your email.';
+      })
+      .catch((err: any) => {
+        this.error = err?.message || 'Failed to resend code';
+      })
+      .finally(() => (this.loading = false));
   }
 }
