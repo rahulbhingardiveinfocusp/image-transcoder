@@ -38,7 +38,7 @@ services:
   fastapi:
     ports:
       - "8000:8000"
-    build: ./backend # <-- Fixed dot notation path
+    build: ./backend 
     container_name: it-fastapi
     depends_on:
       localstack:
@@ -56,12 +56,11 @@ services:
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN}
     volumes:
-      - ./backend:/app # <-- Fixed bind mount format to absolute container path
+      - ./backend:/app 
 
   celery:
-    build: ./backend # <-- Fixed dot notation path
+    build: ./backend 
     container_name: it-celery
-    # Fixed module string with dots and included PYTHONPATH wrapper
     entrypoint: sh -c "PYTHONPATH=/app celery -A app.tasks.image_tasks worker --loglevel=info -P gevent"
     depends_on:
       localstack:
@@ -70,7 +69,6 @@ services:
         condition: service_healthy
     env_file: .env
     volumes:
-      - ./backend:/app # <-- Fixed bind mount format to absolute container path
-
+      - ./backend:/app 
 volumes:
   db_data:

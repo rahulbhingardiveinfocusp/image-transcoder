@@ -33,8 +33,6 @@ class EmailService:
             )
 
         try:
-            # loop = asyncio.get_event_loop()
-            # await loop.run_in_executor(None, _send)
             logger.info(f"Email successfully sent to {recipient_email}")
         except Exception as e:
             logger.error(f"Failed to send email to {recipient_email}: {e}")

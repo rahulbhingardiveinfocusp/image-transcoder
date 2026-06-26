@@ -17,16 +17,12 @@ class DynamoService:
     def __init__(self, table_name: str):
         self.dynamodb = boto3.resource(
             "dynamodb",
-            region_name=settings.AWS_REGION,                      # FIX: was `Settings` (undefined)
-            endpoint_url=settings.LOCALSTACK_ENDPOINT or None,    # FIX: honour localstack in dev
+            region_name=settings.AWS_REGION,                     
+            endpoint_url=settings.LOCALSTACK_ENDPOINT or None,    
             aws_access_key_id=settings.AWS_ACCESS_KEY_ID or None,
             aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY or None,
         )
         self.table = self.dynamodb.Table(table_name)
-
-    # -----------------------
-    # INTERNAL SYNC METHODS
-    # -----------------------
 
     def _get_item(self, pk: str, sk: str) -> Optional[Dict[str, Any]]:
         resp = self.table.get_item(Key={"PK": pk, "SK": sk})
@@ -58,15 +54,12 @@ class DynamoService:
     def _query_by_gsi(
         self,
         index_name: str,
-        key_condition_expression,           # boto3 ConditionBase object
+        key_condition_expression,          
         limit: int = 20,
         scan_forward: bool = False,
         exclusive_start_key: Optional[Dict[str, Any]] = None,
         expression_names: Optional[Dict[str, str]] = None,
     ):
-        # FIX: removed `expression_values` param — boto3 Key() conditions carry
-        # their own values; passing ExpressionAttributeValues separately causes
-        # "Value provided in ExpressionAttributeValues unused" errors.
         params = {
             "IndexName": index_name,
             "KeyConditionExpression": key_condition_expression,
@@ -78,10 +71,6 @@ class DynamoService:
         if expression_names:
             params["ExpressionAttributeNames"] = expression_names
         return self.table.query(**params)
-
-    # -----------------------
-    # ASYNC PUBLIC METHODS
-    # -----------------------
 
     async def get_item(self, pk: str, sk: str) -> Optional[Dict[str, Any]]:
         return await anyio.to_thread.run_sync(self._get_item, pk, sk)
@@ -118,7 +107,6 @@ class DynamoService:
         exclusive_start_key: Optional[Dict[str, Any]] = None,
         expression_names: Optional[Dict[str, str]] = None,
     ):
-        # FIX: signature now matches _query_by_gsi exactly (no expression_values)
         return await anyio.to_thread.run_sync(
             self._query_by_gsi,
             index_name,

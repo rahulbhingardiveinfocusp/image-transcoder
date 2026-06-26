@@ -33,12 +33,10 @@ class S3Service:
             }
 
             if method == "put_object":
-                # ContentType on upload so S3 stores the correct MIME type
                 if content_type:
                     params["ContentType"] = content_type
 
             if method == "get_object":
-                # FIX: ResponseContent* are only valid for get_object, not put_object
                 params["ResponseContentType"] = "image/jpeg"
                 params["ResponseContentDisposition"] = "inline"
 

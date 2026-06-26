@@ -10,7 +10,7 @@ from app.services.cognito import get_cognito_user_count
 import boto3
 
 from app.core.config import settings
-from app.dto.image import ProcessingStatus          # FIX: import from dto, not old model
+from app.dto.image import ProcessingStatus         
 from app.repository.dynamo_image_repo import DynamoImageRepository
 from app.services.s3_service import S3Service
 
@@ -33,9 +33,6 @@ class ImageService:
         loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, lambda: func(*args, **kwargs))
 
-    # -----------------------
-    # REQUEST UPLOAD URL
-    # -----------------------
     @staticmethod
     async def get_upload_url(repo: DynamoImageRepository, filename: str, content_type: str, user:dict):
         image_id = str(uuid.uuid4())
@@ -58,23 +55,16 @@ class ImageService:
         )
         return {"image_id": image_id, "upload_url": presigned_url}
 
-    # -----------------------
-    # ALREADY PROCESSED?
-    # -----------------------
     @staticmethod
     async def already_processed(repo: DynamoImageRepository, key: str) -> bool:
         resp = await repo.list_by_status(ProcessingStatus.COMPLETED.value.upper())
         return any(item.get("s3_key") == key for item in resp["items"])
 
-    # -----------------------
-    # PROCESS IMAGE (S3 copy)
-    # -----------------------
     @classmethod
     async def process_image(cls, repo: DynamoImageRepository, bucket: str, key: str) -> str:
         s3 = cls._get_s3_client()
         new_key = f"processed/{key.split('/')[-1]}"
 
-        # find the record by s3_key via a scan (or use a GSI on s3_key for scale)
         all_items = await repo.list_all()
         image_record = next((i for i in all_items if i.get("s3_key") == key), None)
 
@@ -100,9 +90,6 @@ class ImageService:
 
         return new_key
 
-    # -----------------------
-    # DOWNLOAD / UPLOAD HELPERS
-    # -----------------------
     @classmethod
     async def download_image(cls, bucket: str, key: str) -> bytes:
         s3 = cls._get_s3_client()
@@ -115,9 +102,6 @@ class ImageService:
         s3 = cls._get_s3_client()
         await cls._run_in_executor(s3.put_object, Bucket=bucket, Key=key, Body=data)
 
-    # -----------------------
-    # GET ALL IMAGES
-    # -----------------------
     @classmethod
     async def get_all_images(
         cls,

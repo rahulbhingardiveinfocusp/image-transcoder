@@ -81,7 +81,6 @@ export class UserDashboardComponent {
     this.cdr.markForCheck();
   }
 
-  // ✅ FIXED: ensures UI always updates (including first call)
   loadImages() {
     this.loading = true;
     this.cdr.markForCheck();
@@ -92,7 +91,6 @@ export class UserDashboardComponent {
 
         this.loading = false;
 
-        // 🔥 critical for OnPush reliability
         this.cdr.markForCheck();
       },
       error: () => {
@@ -102,7 +100,7 @@ export class UserDashboardComponent {
     });
   }
 
-  // ✅ computed UI data (no extra state)
+
   get filteredImages(): ImageItem[] {
     let data = this.images;
 
@@ -174,7 +172,6 @@ export class UserDashboardComponent {
 
               this.uploading = false;
 
-              // 🔥 refresh UI
               this.loadImages();
             })
             .catch(() => {
@@ -207,42 +204,7 @@ export class UserDashboardComponent {
     return item.id;
   }
 
-  async shareOriginal(img: any): Promise<void> {debugger
-    await this.shareUrl(img.filename, img.s3_key);
-  }
-
-  async shareProcessed(img: any): Promise<void> {debugger
-    await this.shareUrl(`${img.filename} (Processed)`, img.url);
-  }
-  private async shareUrl(title: string, url: string): Promise<void> {
-    if (!url) {
-      alert('URL not available');
-      return;
-    }
-    try {
-      if (navigator.share) {
-        await navigator.share({ title, url });
-      } else {
-        await this.copyToClipboard(url);
-      }
-    } catch (err) {
-      console.error(err);
-    }
-  }
-
-  private copyToClipboard(url: string): void {
-    // fallback that works even when document is not focused
-    const el = document.createElement('textarea');
-    el.value = url;
-    el.style.position = 'fixed';
-    el.style.opacity = '0';
-    document.body.appendChild(el);
-    el.focus();
-    el.select();
-    document.execCommand('copy');
-    document.body.removeChild(el);
-    alert('Link copied to clipboard');
-  }
+  
   logout(){
     this.auth.logout()
   }

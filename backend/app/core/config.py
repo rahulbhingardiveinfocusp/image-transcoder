@@ -5,10 +5,6 @@ from pydantic_settings import BaseSettings
 from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     PROJECT_NAME: str = "ImageTranscoder"
-
-    # FIX: DATABASE_URL removed — no longer needed after Dynamo migration.
-    # Keep it optional with None default if you want a zero-downtime cutover,
-    # then delete it once Postgres is fully decommissioned.
     DATABASE_URL: Optional[str] = None
 
     AWS_REGION: str = "us-east-1"
@@ -18,8 +14,6 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str
     SQS_QUEUE_URL: str
     LOCALSTACK_ENDPOINT: str = ""
-
-    # FIX: new required field for DynamoDB table
     DYNAMO_IMAGES_TABLE: str
 
     CELERY_QUEUE_NAME: str = "celery-task-queue"

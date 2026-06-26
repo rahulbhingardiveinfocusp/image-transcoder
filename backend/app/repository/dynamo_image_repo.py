@@ -49,7 +49,7 @@ class DynamoImageRepository:
         expression_values: Dict[str, Any] = {
             ":status": status,
             ":gsi_pk": f"STATUS#{status}",
-            ":gsi_sk": gsi_sk,                    # FIX: was missing in original
+            ":gsi_sk": gsi_sk,                    
         }
 
         if processed_key is not None:
@@ -89,7 +89,6 @@ class DynamoImageRepository:
             )
         )
         items = resp.get("Items", [])
-        # sort descending by created_at (mirrors the old ORDER BY created_at DESC)
         items.sort(key=lambda x: x.get("created_at", ""), reverse=True)
         return items
     

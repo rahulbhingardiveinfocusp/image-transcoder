@@ -31,8 +31,6 @@ jobs:
         working-directory: ./backend
         env:
           PYTHONPATH: .
-          # Dummy values so Settings() can instantiate during tests.
-          # The test suite mocks all AWS calls so these are never used.
           S3_BUCKET_NAME: test-bucket
           SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/test-queue
           DYNAMO_IMAGES_TABLE: test-images

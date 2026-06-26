@@ -42,20 +42,12 @@ async def run_processing_logic(bucket: str, key: str) -> dict:
     decoded_key = urllib.parse.unquote(key)
     thumbnail_key: str | None = None
 
-    # FIX: no engine/session — get the singleton DynamoImageRepository
     repo = get_image_repo()
 
-    # -----------------------
-    # ALREADY PROCESSED?
-    # -----------------------
     if await ImageService.already_processed(repo, decoded_key):
         logger.info("[-] Already completed, skipping: %s", decoded_key)
         return {"status": "already_processed"}
 
-    # -----------------------
-    # FIND THE RECORD
-    # -----------------------
-    # FIX: was a raw `select(Image).where(...)` SQL query
     all_items = await repo.list_all()
     image_record = next((i for i in all_items if i.get("s3_key") == decoded_key), None)
 
@@ -64,16 +56,9 @@ async def run_processing_logic(bucket: str, key: str) -> dict:
 
     image_id = image_record["id"]
 
-    # -----------------------
-    # MARK AS PROCESSING
-    # -----------------------
-    # FIX: was `image_record.status = ProcessingStatus.PROCESSING` + session.commit()
     await repo.update_status(image_id, ProcessingStatus.PROCESSING.value.upper())
 
     try:
-        # -----------------------
-        # DOWNLOAD → THUMBNAIL → UPLOAD
-        # -----------------------
         image_data = await ImageService.download_image(bucket, decoded_key)
         if not image_data:
             raise RuntimeError(f"Key not found: {bucket}/{decoded_key}")
@@ -83,17 +68,8 @@ async def run_processing_logic(bucket: str, key: str) -> dict:
         thumbnail_key = f"thumbnails/{filename}"
         await ImageService.upload_thumbnail(bucket, thumbnail_key, thumbnail_data)
 
-        # -----------------------
-        # PROCESS (S3 copy raw → processed)
-        # -----------------------
-        # FIX: was `ImageService.process_image(session, ...)` — now passes repo
         new_key = await ImageService.process_image(repo, bucket, decoded_key)
 
-        # -----------------------
-        # MARK AS COMPLETED
-        # -----------------------
-        # FIX: was three separate ORM field assignments + session.commit()
-        # update_status now accepts processed_key to do it in one write
         await repo.update_status(
             image_id,
             ProcessingStatus.COMPLETED.value.upper(),
@@ -101,7 +77,6 @@ async def run_processing_logic(bucket: str, key: str) -> dict:
         )
 
     except Exception:
-        # FIX: was `image_record.status = ProcessingStatus.FAILED` + session.commit()
         await repo.update_status(image_id, ProcessingStatus.FAILED.value.upper())
         raise
 
