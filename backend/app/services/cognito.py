@@ -5,6 +5,14 @@ import requests
 from jose import jwt
 import logging
 import sys
+import boto3
+from app.core.config import settings
+
+cognito = boto3.client(
+    "cognito-idp",
+    region_name=settings.AWS_REGION
+)
+
 logging.basicConfig(
     stream=sys.stdout,
     level=logging.INFO,
@@ -71,3 +79,26 @@ def require_admin(payload: dict = Depends(verify_cognito_token)):
     if "Admin" not in groups:
         raise HTTPException(status_code=403, detail="Admin privileges required")
     return payload
+
+def get_cognito_user_count():
+    total = 0
+    pagination_token = None
+
+    while True:
+        params = {
+            "UserPoolId": settings.USER_POOL_ID,
+            "Limit": 60
+        }
+
+        if pagination_token:
+            params["PaginationToken"] = pagination_token
+
+        response = cognito.list_users(**params)
+
+        total += len(response.get("Users", []))
+        pagination_token = response.get("PaginationToken")
+
+        if not pagination_token:
+            break
+
+    return total

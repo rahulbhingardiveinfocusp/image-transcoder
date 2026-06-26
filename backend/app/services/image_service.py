@@ -6,6 +6,7 @@ import uuid
 from typing import Any, Callable
 from xml.dom.minidom import Attr
 
+from backend.app.services.cognito import get_cognito_user_count
 import boto3
 
 from app.core.config import settings
@@ -152,27 +153,24 @@ class ImageService:
             return repo.dynamo.table.scan()
 
         resp = await anyio.to_thread.run_sync(scan_images)
-
         items = resp.get("Items", [])
-
         total_files = len(items)
-
-        # extract unique users
         users = set()
 
         for item in items:
             if "created_by" in item:
                 users.add(item["created_by"])
+        
+        total_users = await anyio.to_thread.run_sync(get_cognito_user_count)
 
         return {
-            "total_users": len(users),
+            "total_users": total_users,
             "total_files": total_files
         }
     
     @staticmethod
     async def get_users_summary(repo: DynamoImageRepository):
         import anyio
-
         def scan_images():
             return repo.dynamo.table.scan()
 
