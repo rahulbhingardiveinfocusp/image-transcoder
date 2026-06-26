@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { ChangeDetectorRef, Component, NgZone } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -25,31 +25,43 @@ export class LoginComponent {
 
   constructor(
     private auth: AuthService,
-    private router: Router
+    private router: Router,
+    private cdr: ChangeDetectorRef
   ) {}
 
-  login() {
-    this.error = '';
-    this.success = '';
-    this.loading = true;
+login() {
+  this.error = '';
+  this.success = '';
+  this.loading = true;
 
-    this.auth
-      .login(this.email, this.password)
-      .then(() => this.auth.isAdmin())
+  this.auth.login(this.email, this.password)
+    .then(() => this.auth.isAdmin())
+    .then((isAdmin) => {
+      this.router.navigate([isAdmin ? '/admin' : '/user']);
+    })
+    .catch((err) => {
+      console.log('ERROR:', err);
+
+      this.error = err?.message || 'Login failed';
+       this.cdr.detectChanges(); 
+    })
+    .finally(() => {
+      this.loading = false;
+    });
+}
+
+  isAdmin() {
+    return this.auth
+      .isAdmin()
       .then((isAdmin) => {
         this.router.navigate([isAdmin ? '/admin' : '/user']);
       })
       .catch((err: any) => {
-        if (err?.name === 'UserNotConfirmedException') {
-          this.showConfirmation = true;
-          this.success = 'Please verify your account first';
-        } else {
-          this.error = err?.message || 'Login failed';
-        }
+        this.error = err?.message;
+         this.cdr.detectChanges(); 
       })
       .finally(() => (this.loading = false));
   }
-
   signup() {
     this.error = '';
     this.success = '';
