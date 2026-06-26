@@ -6,7 +6,7 @@ import uuid
 from typing import Any, Callable
 from xml.dom.minidom import Attr
 
-from backend.app.services.cognito import get_cognito_user_count
+from app.services.cognito import get_cognito_user_count
 import boto3
 
 from app.core.config import settings
