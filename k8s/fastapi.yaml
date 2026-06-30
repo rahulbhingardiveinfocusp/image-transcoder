@@ -29,7 +29,6 @@ metadata:
   name: fastapi
   namespace: app-local
 spec:
-  type: NodePort
   selector: { app: fastapi }
   ports:
     - port: 8000

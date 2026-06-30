@@ -22,6 +22,7 @@ IDS_FILE=".local-cognito-ids"   # caches pool/client id between runs (idempotenc
 LS_ENV=(env AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION="$REGION")
 
 PF_PID=""
+PERSIST_PIDS_FILE=".port-forward-pids"
 cleanup() {
   if [ -n "$PF_PID" ]; then kill "$PF_PID" 2>/dev/null || true; fi
 }
@@ -162,7 +163,49 @@ kubectl apply -f k8s/celery.yaml
 kubectl -n "$NAMESPACE" rollout status deployment/fastapi --timeout=120s
 kubectl -n "$NAMESPACE" rollout status deployment/celery --timeout=120s
 
+echo "==> 11. Port-forward fastapi to a fixed local port (persists after this script exits)"
+BACKEND_LOCAL_PORT=30080
+# kill any stale forward on this port from a previous run
+pkill -f "port-forward.*svc/fastapi.*${BACKEND_LOCAL_PORT}:8000" 2>/dev/null || true
+nohup kubectl -n "$NAMESPACE" port-forward --address 127.0.0.1 svc/fastapi "${BACKEND_LOCAL_PORT}:8000" \
+  >/tmp/fastapi-pf.log 2>&1 &
+FASTAPI_PF_PID=$!
+disown "$FASTAPI_PF_PID"
+sleep 2
+BACKEND_URL="http://127.0.0.1:${BACKEND_LOCAL_PORT}"
+
+echo "==> 12. Build + deploy frontend"
+FRONTEND_IMAGE="frontend-app:local"
+FRONTEND_DIR="./frontend"
+
+docker build \
+  -f "${FRONTEND_DIR}/Dockerfile" \
+  --build-arg BACKEND_API_URL="$BACKEND_URL" \
+  --build-arg COGNITO_USER_POOL_ID="$USER_POOL_ID" \
+  --build-arg COGNITO_CLIENT_ID="$USER_POOL_CLIENT_ID" \
+  --build-arg COGNITO_REGION="$REGION" \
+  -t "$FRONTEND_IMAGE" \
+  "$FRONTEND_DIR"
+
+kubectl apply -f k8s/frontend.yaml
+kubectl -n "$NAMESPACE" rollout status deployment/frontend --timeout=120s
+
+echo "==> 13. Port-forward frontend to a fixed local port (persists after this script exits)"
+FRONTEND_LOCAL_PORT=30090
+pkill -f "port-forward.*svc/frontend.*${FRONTEND_LOCAL_PORT}:80" 2>/dev/null || true
+nohup kubectl -n "$NAMESPACE" port-forward --address 127.0.0.1 svc/frontend "${FRONTEND_LOCAL_PORT}:80" \
+  >/tmp/frontend-pf.log 2>&1 &
+FRONTEND_PF_PID=$!
+disown "$FRONTEND_PF_PID"
+sleep 2
+
+echo "$FASTAPI_PF_PID" > "$PERSIST_PIDS_FILE"
+echo "$FRONTEND_PF_PID" >> "$PERSIST_PIDS_FILE"
+
 echo "==> Done."
-echo "    App URL:   $(minikube service fastapi -n "$NAMESPACE" --url)"
+echo "    Frontend URL: http://127.0.0.1:${FRONTEND_LOCAL_PORT}"
+echo "    Backend URL:  ${BACKEND_URL}"
 echo "    Admin login: $ADMIN_EMAIL / $ADMIN_PASSWORD"
+echo "    (Port-forwards run in the background — no terminal needs to stay open.)"
+echo "    To stop them later: ./stop.sh (or kill \$(cat $PERSIST_PIDS_FILE))"
 echo "    LocalStack: kubectl -n $NAMESPACE port-forward svc/localstack 4566:4566 (if you need host access again)"

@@ -22,7 +22,18 @@ for arg in "$@"; do
 done
 
 echo "==> Killing any leftover localstack port-forwards"
-pkill -f "port-forward svc/localstack" 2>/dev/null || true
+pkill -f "port-forward.*svc/localstack" 2>/dev/null || true
+
+echo "==> Killing persistent fastapi/frontend port-forwards"
+PERSIST_PIDS_FILE=".port-forward-pids"
+if [ -f "$PERSIST_PIDS_FILE" ]; then
+  while read -r pid; do
+    kill "$pid" 2>/dev/null || true
+  done < "$PERSIST_PIDS_FILE"
+  rm -f "$PERSIST_PIDS_FILE"
+fi
+pkill -f "port-forward.*svc/fastapi" 2>/dev/null || true
+pkill -f "port-forward.*svc/frontend" 2>/dev/null || true
 
 echo "==> Deleting app workloads (namespace: $NAMESPACE)"
 kubectl delete namespace "$NAMESPACE" --ignore-not-found
