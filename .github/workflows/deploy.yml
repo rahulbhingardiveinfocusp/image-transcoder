@@ -9,7 +9,7 @@ on:
         description: 'Action'
         required: true
         type: choice
-        options: [deploy, destroy]
+        options: [deploy, destroy, cognito-only]
 
 jobs:
   # =========================================================================
@@ -53,10 +53,10 @@ jobs:
           DOCKER_REPO: ${{ secrets.DOCKER_REPO }}
 
   # =========================================================================
-  # 2. MANUAL DISPATCH: Infrastructure + App Deployment
+  # 2. MANUAL DISPATCH: Infrastructure + App Deployment (deploy / destroy)
   # =========================================================================
   deploy-infrastructure:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action != 'cognito-only'
     runs-on: ubuntu-latest
     environment: dev
     steps:
@@ -175,3 +175,59 @@ jobs:
           aws ssm wait command-executed \
             --command-id "$COMMAND_ID" \
             --instance-id "${{ steps.terraform_step.outputs.fetched_instance_id }}"
+
+  # =========================================================================
+  # 3. MANUAL DISPATCH: Cognito-only (for local dev — no other infra touched)
+  # =========================================================================
+  cognito-only:
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'cognito-only'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.0"
+
+      - name: Apply Cognito Resources Only
+        working-directory: ./terraform
+        env:
+          AWS_ACCESS_KEY_ID:          ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY:      ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION:         ${{ secrets.AWS_REGION }}
+          TF_VAR_aws_region:          ${{ secrets.AWS_REGION }}
+          TF_VAR_s3_bucket_name:      ${{ secrets.S3_BUCKET_NAME }}
+          TF_VAR_dockerhub_username:  ${{ secrets.DOCKERHUB_USERNAME }}
+          TF_VAR_docker_repo:         ${{ secrets.DOCKER_REPO }}
+          TF_VAR_celery_queue_name:   ${{ secrets.CELERY_QUEUE_NAME }}
+          TF_VAR_admin_email:         ${{ secrets.ADMIN_EMAIL }}
+          TF_VAR_admin_password:      ${{ secrets.ADMIN_PASSWORD }}
+          TF_VAR_dynamo_images_table: ${{ secrets.DYNAMO_IMAGES_TABLE }}
+        run: |
+          terraform init
+          terraform apply -auto-approve \
+            -target=aws_cognito_user_pool.main \
+            -target=aws_cognito_user_pool_client.client \
+            -target=aws_cognito_user_group.admin_group \
+            -target=aws_cognito_user_group.user_group \
+            -target=aws_cognito_user.admin \
+            -target=aws_cognito_user_in_group.admin_membership \
+            -target=null_resource.set_admin_password
+
+          {
+            echo "### Cognito resources ready"
+            echo ""
+            echo "| Value | Output |"
+            echo "|---|---|"
+            echo "| USER_POOL_ID | \`$(terraform output -raw user_pool_id)\` |"
+            echo "| USER_POOL_CLIENT_ID | \`$(terraform output -raw user_pool_client_id)\` |"
+            echo ""
+            echo "Use these for local dev, e.g.:"
+            echo '```'
+            echo "export USER_POOL_ID=$(terraform output -raw user_pool_id)"
+            echo "export USER_POOL_CLIENT_ID=$(terraform output -raw user_pool_client_id)"
+            echo "./start.sh"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

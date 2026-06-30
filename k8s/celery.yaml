@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery
+  namespace: app-local
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: celery }
+  template:
+    metadata:
+      labels: { app: celery }
+    spec:
+      containers:
+        - name: celery
+          image: fastapi-app:local
+          imagePullPolicy: Never
+          envFrom:
+            - configMapRef: { name: app-config }
+          env:
+            - name: CONTAINER_ROLE
+              value: "worker"
