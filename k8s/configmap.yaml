@@ -2,17 +2,15 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: app-config
-  namespace: app-local
 data:
-  S3_BUCKET_NAME: "${S3_BUCKET}"
-  SQS_QUEUE_URL: "${SQS_QUEUE_URL}"
-  CELERY_QUEUE_NAME: "${CELERY_QUEUE}"
-  CELERY_TASK_QUEUE_URL: "${CELERY_QUEUE_URL}"
-  DYNAMO_IMAGES_TABLE: "${DYNAMO_TABLE}"
-  AWS_REGION: "${REGION}"
-  ADMIN_EMAIL: "${ADMIN_EMAIL}"
-  LOCALSTACK_ENDPOINT: "http://localstack.app-local.svc.cluster.local:4566"
-  AWS_ACCESS_KEY_ID: "test"
-  AWS_SECRET_ACCESS_KEY: "test"
-  USER_POOL_ID: "${USER_POOL_ID}"
-  USER_POOL_CLIENT_ID: "${USER_POOL_CLIENT_ID}"
+  SQS_QUEUE_URL: "sqs://localstack:4566/000000000000/image-processing-queue"
+  S3_BUCKET_NAME: "my-test-bucket"
+  AWS_REGION: "us-west-1"
+  LOCALSTACK_ENDPOINT: "http://localstack:4566"
+  CELERY_TASK_QUEUE_URL: "sqs://localstack:4566/000000000000/simple-celery-queue"
+  DYNAMO_IMAGES_TABLE: "images"
+  CONTAINER_ROLE: "web"
+  CELERY_QUEUE_NAME: "simple-celery-queue"
+  USER_POOL_ID: "us-west-1_ILaOz7UMh"
+  USER_POOL_CLIENT_ID: "69fepakmfdd494brmp48eakupi"
+  ADMIN_EMAIL: "madnands5@gmail.com"

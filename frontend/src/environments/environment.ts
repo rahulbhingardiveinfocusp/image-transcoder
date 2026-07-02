@@ -1,7 +1,8 @@
 export const environment = {
   production: false,
-  apiUrl: 'https://d3f2x801nsgav4.cloudfront.net',
-  cognitoUserPoolId: 'us-west-1_Xd6Hqasr8',
-  cognitoClientId: '5to3onf4ks2ntv9rpaa8g64qs4',
-  cognitoRegion:'us-west-1'
+  apiUrl: 'http://localhost:8000',
+  cognitoUserPoolId: 'us-west-1_ILaOz7UMh',
+  cognitoClientId: '69fepakmfdd494brmp48eakupi',
+  cognitoRegion:'us-west-1',
+  useLocalStackUrl:'http://localhost:4566'
 };

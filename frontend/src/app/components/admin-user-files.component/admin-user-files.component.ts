@@ -8,6 +8,7 @@ import {
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
+import { environment } from '../../../environments/environment';
 
 interface UserFile {
   id: string;
@@ -26,7 +27,7 @@ interface UserFile {
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class AdminUserFilesComponent implements OnInit {
-
+  private apiBaseUrl = environment.apiUrl;
   userId = '';
 
   files: UserFile[] = [];
@@ -52,7 +53,7 @@ export class AdminUserFilesComponent implements OnInit {
 
     this.http
       .get<UserFile[]>(
-        `/api/v1/admin/users/${this.userId}/files`
+        `${this.apiBaseUrl}/api/v1/admin/users/${this.userId}/files`
       )
       .subscribe({
         next: files => {

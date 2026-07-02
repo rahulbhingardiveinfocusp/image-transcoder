@@ -1,4 +1,4 @@
-# Place this at ./frontend/Dockerfile
+#./frontend/Dockerfile
 FROM node:24 AS build
 WORKDIR /app
 COPY . .

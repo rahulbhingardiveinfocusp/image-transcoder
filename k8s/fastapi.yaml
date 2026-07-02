@@ -2,34 +2,35 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: fastapi
-  namespace: app-local
 spec:
   replicas: 1
   selector:
-    matchLabels: { app: fastapi }
+    matchLabels:
+      app: fastapi
   template:
     metadata:
-      labels: { app: fastapi }
+      labels:
+        app: fastapi
     spec:
       containers:
         - name: fastapi
-          image: fastapi-app:local
-          imagePullPolicy: Never
+          image: it-fastapi:local
           ports:
             - containerPort: 8000
           envFrom:
-            - configMapRef: { name: app-config }
-          env:
-            - name: CONTAINER_ROLE
-              value: "web"
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: fastapi
-  namespace: app-local
 spec:
-  selector: { app: fastapi }
+  selector:
+    app: fastapi
   ports:
     - port: 8000
       targetPort: 8000
+  type: NodePort

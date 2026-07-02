@@ -7,7 +7,7 @@ from app.api.v1.router import router as v1_router
 app = FastAPI(title=settings.PROJECT_NAME)
 
 origins = [
-    "http://localhost:4200",
+    "http://localhost:4200","http://127.0.0.1:4200"
 ]
 
 app.add_middleware(

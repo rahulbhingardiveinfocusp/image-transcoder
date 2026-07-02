@@ -32,11 +32,11 @@ jobs:
         env:
           PYTHONPATH: .
           S3_BUCKET_NAME: test-bucket
-          SQS_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/test-queue
+          SQS_QUEUE_URL: https://sqs.us-west-1.amazonaws.com/000000000000/test-queue
           DYNAMO_IMAGES_TABLE: test-images
-          CELERY_TASK_QUEUE_URL: https://sqs.us-east-1.amazonaws.com/000000000000/test-celery
+          CELERY_TASK_QUEUE_URL: https://sqs.us-west-1.amazonaws.com/000000000000/test-celery
           ADMIN_EMAIL: test@example.com
-          AWS_REGION: us-east-1
+          AWS_REGION: us-west-1
           LOCALSTACK_ENDPOINT: ""
           CELERY_QUEUE_NAME: test-celery
         run: |

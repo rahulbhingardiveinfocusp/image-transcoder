@@ -1,10 +1,17 @@
+from venv import logger
+
 import boto3
 import logging
 from app.core.config import settings
-
 logger = logging.getLogger(__name__)
+from botocore.config import Config
+is_local = settings.LOCALSTACK_ENDPOINT is not None
 
-endpoint_url = settings.LOCALSTACK_ENDPOINT if settings.LOCALSTACK_ENDPOINT else None
+# 1. INTERNAL: for boto3 calls
+internal_endpoint = settings.LOCALSTACK_ENDPOINT
+
+# 2. PUBLIC: what browser can access
+public_endpoint = "http://localhost:4566" if is_local else None
 
 
 class S3Service:
@@ -12,12 +19,24 @@ class S3Service:
         self.s3 = boto3.client(
             "s3",
             region_name=settings.AWS_REGION,
-            endpoint_url=endpoint_url,
-            config=boto3.session.Config(
+            endpoint_url=internal_endpoint,
+            config=Config(
                 signature_version="s3v4",
-                s3={"addressing_style": "virtual"},
+                s3={
+                    # IMPORTANT FIX
+                    "addressing_style": "path" if is_local else "virtual"
+                },
             ),
         )
+
+        self.public_endpoint = public_endpoint
+
+    def make_public_url(self, url: str) -> str:
+        if not self.public_endpoint:
+            return url
+
+        # replace internal host with browser-safe host
+        return url.replace(settings.LOCALSTACK_ENDPOINT, self.public_endpoint)
 
     def generate_presigned_url(
         self,
@@ -40,11 +59,12 @@ class S3Service:
                 params["ResponseContentType"] = "image/jpeg"
                 params["ResponseContentDisposition"] = "inline"
 
-            return self.s3.generate_presigned_url(
+            url= self.s3.generate_presigned_url(
                 ClientMethod=method,
                 Params=params,
                 ExpiresIn=expiration,
             )
+            return self.make_public_url(url)
         except Exception as e:
             logger.error(f"Error generating presigned URL for {object_name}: {e}")
             raise

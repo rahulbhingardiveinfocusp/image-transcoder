@@ -4,6 +4,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
+import { environment } from '../../../environments/environment';
 
 export interface AdminStats {
   total_users: number;
@@ -42,7 +43,7 @@ export class AdminDashboardComponent implements OnInit {
   loadingFiles = false;
   searchTerm = '';
   modalOpen = false;
-
+  private apiBaseUrl = environment.apiUrl;
   constructor(
     private http: HttpClient,
     private router: Router,
@@ -61,7 +62,7 @@ export class AdminDashboardComponent implements OnInit {
 
   loadStats() {
     this.http
-      .get<AdminStats>('/api/v1/admin/stats')
+      .get<AdminStats>(`${this.apiBaseUrl}/api/v1/admin/stats`)
       .subscribe(res => {
         this.stats = res;
         this.cdr.markForCheck();
@@ -71,7 +72,7 @@ export class AdminDashboardComponent implements OnInit {
   loadUsers() {
     this.loadingUsers = true;
     this.http
-      .get<UserSummary[]>('/api/v1/admin/users')
+      .get<UserSummary[]>(`${this.apiBaseUrl}/api/v1/admin/users`)
       .subscribe({
         next: users => {
           this.users = users;
@@ -92,7 +93,7 @@ export class AdminDashboardComponent implements OnInit {
     this.loadingFiles = true;
 
     this.http
-      .get<UserFile[]>(`/api/v1/admin/users/${user.user_id}/files`)
+      .get<UserFile[]>(`${this.apiBaseUrl}/api/v1/admin/users/${user.user_id}/files`)
       .subscribe({
         next: files => {
           this.userFiles = files;

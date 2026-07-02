@@ -162,8 +162,11 @@ export class UserDashboardComponent {
             headers: { 'Content-Type': file.type },
             body: file,
           })
-            .then((response) => {
-              if (!response.ok) throw new Error();
+            .then(async(response) => {
+             if (!response.ok) {
+              console.error(await response.text());
+              throw new Error("S3 upload failed");
+            }
 
               this.selectedFile = null;
               if (this.fileInput) {

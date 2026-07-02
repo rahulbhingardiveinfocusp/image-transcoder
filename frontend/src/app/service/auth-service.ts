@@ -74,7 +74,7 @@ export class AuthService {
     try {
       const session = await fetchAuthSession();
 
-      const token = session.tokens?.idToken?.toString();
+      const token = session.tokens?.idToken?.toString()
 
       console.log('AuthService token:', token);
 

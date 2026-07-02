@@ -5,35 +5,24 @@ services:
     ports:
       - "4566:4566"
     environment:
-      - SERVICES=s3,sqs,ses
+      - SERVICES=s3,sqs,ses,dynamodb
       - DEBUG=1
+      - AWS_DEFAULT_REGION=us-west-1
       - LOCALSTACK_AUTH_TOKEN=${LOCALSTACK_AUTH_TOKEN:-""}
     volumes:
       - ./init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh
       - ./localstack-data:/var/lib/localstack
       - /var/run/docker.sock:/var/run/docker.sock
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:4566/_localstack/health || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: it-postgres
-    ports:
-    - "5432:5432"
-    environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=fastapi
-    volumes:
-      - db_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d fastapi"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://localhost:4566/_localstack/health >/dev/null && test -f /var/lib/localstack/init-complete"
+        ]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 30
+      start_period: 10s
 
   fastapi:
     ports:
@@ -43,12 +32,9 @@ services:
     depends_on:
       localstack:
         condition: service_healthy
-      postgres:
-        condition: service_healthy
     env_file:
       - .env
     environment:
-      - DATABASE_URL=${DATABASE_URL}
       - SQS_QUEUE_URL=${SQS_QUEUE_URL}
       - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - AWS_REGION=${AWS_REGION}
@@ -64,8 +50,6 @@ services:
     entrypoint: sh -c "PYTHONPATH=/app celery -A app.tasks.image_tasks worker --loglevel=info -P gevent"
     depends_on:
       localstack:
-        condition: service_healthy
-      postgres:
         condition: service_healthy
     env_file: .env
     volumes:

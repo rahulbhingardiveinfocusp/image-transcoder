@@ -303,9 +303,6 @@ sudo chmod +x /usr/local/bin/docker-compose
 mkdir -p /home/ubuntu/app
 cd /home/ubuntu/app
 
-# FIX: postgres service removed entirely — app now uses DynamoDB.
-# DATABASE_URL env var removed from both fastapi and celery containers.
-# DYNAMO_IMAGES_TABLE added to both containers.
 cat << 'DOCKER_COMPOSE' > docker-compose.yml
 services:
   fastapi:

@@ -1,211 +1,27 @@
-#!/usr/bin/env bash
-set -euo pipefail
+#!/bin/bash
+set -e
 
-# =============================================================================
-# CONFIG — adjust as needed
-# =============================================================================
-NAMESPACE="app-local"
-REGION="us-east-1"
-S3_BUCKET="local-image-bucket"
-SQS_QUEUE="image-processing-queue"
-CELERY_QUEUE="celery-task-queue"
-DYNAMO_TABLE="images"
-ADMIN_EMAIL="${ADMIN_EMAIL:-admin@example.com}"
-ADMIN_PASSWORD="${ADMIN_PASSWORD:-LocalDevPass1!}"
-BACKEND_IMAGE="fastapi-app:local"
-BACKEND_DIR="./backend"
-ENDPOINT="http://localhost:4566"
-IDS_FILE=".local-cognito-ids"   # caches pool/client id between runs (idempotency)
+echo "🚀 Starting Minikube..."
+minikube start
 
-# Fake creds used ONLY for LocalStack calls (S3/SQS/DynamoDB). Real AWS calls
-# (Cognito fallback) below explicitly avoid these so your normal profile is used.
-LS_ENV=(env AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION="$REGION")
+echo "🔧 Using Minikube Docker..."
+eval $(minikube docker-env)
 
-PF_PID=""
-PERSIST_PIDS_FILE=".port-forward-pids"
-cleanup() {
-  if [ -n "$PF_PID" ]; then kill "$PF_PID" 2>/dev/null || true; fi
-}
-trap cleanup EXIT
+echo "📦 Building FastAPI/Celery image..."
+docker build -t it-fastapi:local ./backend
 
-echo "==> 1. Minikube"
-if ! minikube status >/dev/null 2>&1; then
-  minikube start --cpus=4 --memory=6g
-fi
-
-echo "==> 2. Build backend image into Minikube's docker daemon"
-eval "$(minikube docker-env)"
-docker build -t "$BACKEND_IMAGE" "$BACKEND_DIR"
-
-echo "==> 3. Apply namespace + LocalStack"
-kubectl apply -f k8s/namespace.yaml
-export LOCALSTACK_AUTH_TOKEN="${LOCALSTACK_AUTH_TOKEN:-}"
-envsubst < k8s/localstack.yaml > /tmp/localstack.yaml
-kubectl apply -f /tmp/localstack.yaml
-kubectl -n "$NAMESPACE" wait --for=condition=ready pod -l app=localstack --timeout=180s
-
-echo "==> 4. Port-forward LocalStack to host so this script can provision it"
-kubectl -n "$NAMESPACE" port-forward svc/localstack 4566:4566 >/tmp/localstack-pf.log 2>&1 &
-PF_PID=$!
-sleep 3
-
-echo "==> 5. Create S3 bucket"
-"${LS_ENV[@]}" aws --endpoint-url="$ENDPOINT" s3 mb "s3://$S3_BUCKET" 2>/dev/null || echo "   (bucket already exists)"
-
-echo "==> 6. Create SQS queues"
-SQS_QUEUE_URL=$("${LS_ENV[@]}" aws --endpoint-url="$ENDPOINT" sqs create-queue \
-  --queue-name "$SQS_QUEUE" --attributes ReceiveMessageWaitTimeSeconds=20 \
-  --query QueueUrl --output text)
-
-CELERY_QUEUE_URL=$("${LS_ENV[@]}" aws --endpoint-url="$ENDPOINT" sqs create-queue \
-  --queue-name "$CELERY_QUEUE" --attributes VisibilityTimeout=3600,ReceiveMessageWaitTimeSeconds=20 \
-  --query QueueUrl --output text)
-
-echo "==> 7. Wire S3 -> SQS notifications"
-SQS_QUEUE_ARN=$("${LS_ENV[@]}" aws --endpoint-url="$ENDPOINT" sqs get-queue-attributes \
-  --queue-url "$SQS_QUEUE_URL" --attribute-names QueueArn --query Attributes.QueueArn --output text)
-
-cat > /tmp/notif.json <<EOF
-{
-  "QueueConfigurations": [
-    {
-      "QueueArn": "$SQS_QUEUE_ARN",
-      "Events": ["s3:ObjectCreated:*"],
-      "Filter": {"Key": {"FilterRules": [{"Name": "prefix", "Value": "raw/"}]}}
-    }
-  ]
-}
-EOF
-"${LS_ENV[@]}" aws --endpoint-url="$ENDPOINT" s3api put-bucket-notification-configuration \
-  --bucket "$S3_BUCKET" --notification-configuration file:///tmp/notif.json
-
-echo "==> 8. Create DynamoDB table (PK/SK + GSI1, matches single-table design)"
-"${LS_ENV[@]}" aws --endpoint-url="$ENDPOINT" dynamodb create-table \
-  --table-name "$DYNAMO_TABLE" \
-  --attribute-definitions \
-      AttributeName=PK,AttributeType=S \
-      AttributeName=SK,AttributeType=S \
-      AttributeName=GSI1PK,AttributeType=S \
-      AttributeName=GSI1SK,AttributeType=S \
-  --key-schema AttributeName=PK,KeyType=HASH AttributeName=SK,KeyType=RANGE \
-  --global-secondary-indexes '[{
-      "IndexName": "GSI1",
-      "KeySchema": [
-        {"AttributeName":"GSI1PK","KeyType":"HASH"},
-        {"AttributeName":"GSI1SK","KeyType":"RANGE"}
-      ],
-      "Projection": {"ProjectionType":"ALL"}
-  }]' \
-  --billing-mode PAY_PER_REQUEST >/dev/null 2>&1 || echo "   (table already exists)"
-
-echo "==> 9. Cognito"
-if [ -n "${USER_POOL_ID:-}" ] && [ -n "${USER_POOL_CLIENT_ID:-}" ]; then
-  # Pre-provisioned via the GitHub Actions "cognito-only" workflow_dispatch
-  # option — no real AWS credentials needed locally at all in this path.
-  echo "   Using pre-set USER_POOL_ID/USER_POOL_CLIENT_ID from environment (from CI)"
-  cat > "$IDS_FILE" <<EOF
-USER_POOL_ID=$USER_POOL_ID
-USER_POOL_CLIENT_ID=$USER_POOL_CLIENT_ID
-EOF
-elif [ -f "$IDS_FILE" ]; then
-  source "$IDS_FILE"
-  echo "   Reusing cached pool: $USER_POOL_ID"
-else
-  echo "   No USER_POOL_ID/USER_POOL_CLIENT_ID set and no cache found."
-  echo "   Falling back to creating Cognito via your local AWS CLI profile (real AWS)."
-  USER_POOL_ID=$(aws cognito-idp create-user-pool \
-    --pool-name "app-user-pool-local" \
-    --region "$REGION" \
-    --username-attributes email \
-    --auto-verified-attributes email \
-    --policies '{"PasswordPolicy":{"MinimumLength":8,"RequireUppercase":true,"RequireLowercase":true,"RequireNumbers":true,"RequireSymbols":true}}' \
-    --query 'UserPool.Id' --output text)
-
-  USER_POOL_CLIENT_ID=$(aws cognito-idp create-user-pool-client \
-    --user-pool-id "$USER_POOL_ID" \
-    --region "$REGION" \
-    --client-name "angular-app-client-local" \
-    --explicit-auth-flows ALLOW_USER_SRP_AUTH ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH \
-    --prevent-user-existence-errors ENABLED \
-    --no-generate-secret \
-    --query 'UserPoolClient.ClientId' --output text)
-
-  aws cognito-idp create-group --user-pool-id "$USER_POOL_ID" --region "$REGION" \
-    --group-name Admin --description "Administrative users with full access" >/dev/null
-  aws cognito-idp create-group --user-pool-id "$USER_POOL_ID" --region "$REGION" \
-    --group-name User --description "Standard application users" >/dev/null
-
-  aws cognito-idp admin-create-user --user-pool-id "$USER_POOL_ID" --region "$REGION" \
-    --username "$ADMIN_EMAIL" \
-    --user-attributes Name=email,Value="$ADMIN_EMAIL" Name=email_verified,Value=true \
-    --message-action SUPPRESS >/dev/null
-
-  aws cognito-idp admin-set-user-password --user-pool-id "$USER_POOL_ID" --region "$REGION" \
-    --username "$ADMIN_EMAIL" --password "$ADMIN_PASSWORD" --permanent
-
-  aws cognito-idp admin-add-user-to-group --user-pool-id "$USER_POOL_ID" --region "$REGION" \
-    --username "$ADMIN_EMAIL" --group-name Admin
-
-  cat > "$IDS_FILE" <<EOF
-USER_POOL_ID=$USER_POOL_ID
-USER_POOL_CLIENT_ID=$USER_POOL_CLIENT_ID
-EOF
-  echo "   Created pool: $USER_POOL_ID (admin: $ADMIN_EMAIL / $ADMIN_PASSWORD)"
-fi
-
-echo "==> 10. Render ConfigMap and deploy app"
-export S3_BUCKET SQS_QUEUE_URL CELERY_QUEUE CELERY_QUEUE_URL DYNAMO_TABLE REGION ADMIN_EMAIL USER_POOL_ID USER_POOL_CLIENT_ID
-envsubst < k8s/configmap.yaml > /tmp/configmap.yaml
-kubectl apply -f /tmp/configmap.yaml
+echo "📦 Applying Kubernetes manifests..."
+kubectl apply -f k8s/secrets.yaml
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/localstack.yaml
 kubectl apply -f k8s/fastapi.yaml
 kubectl apply -f k8s/celery.yaml
 
-kubectl -n "$NAMESPACE" rollout status deployment/fastapi --timeout=120s
-kubectl -n "$NAMESPACE" rollout status deployment/celery --timeout=120s
+echo "⏳ Waiting for pods..."
+kubectl wait --for=condition=ready pod -l app=localstack --timeout=180s || true
+kubectl wait --for=condition=ready pod -l app=fastapi --timeout=180s || true
+kubectl wait --for=condition=ready pod -l app=celery --timeout=180s || true
 
-echo "==> 11. Port-forward fastapi to a fixed local port (persists after this script exits)"
-BACKEND_LOCAL_PORT=30080
-# kill any stale forward on this port from a previous run
-pkill -f "port-forward.*svc/fastapi.*${BACKEND_LOCAL_PORT}:8000" 2>/dev/null || true
-nohup kubectl -n "$NAMESPACE" port-forward --address 127.0.0.1 svc/fastapi "${BACKEND_LOCAL_PORT}:8000" \
-  >/tmp/fastapi-pf.log 2>&1 &
-FASTAPI_PF_PID=$!
-disown "$FASTAPI_PF_PID"
-sleep 2
-BACKEND_URL="http://127.0.0.1:${BACKEND_LOCAL_PORT}"
-
-echo "==> 12. Build + deploy frontend"
-FRONTEND_IMAGE="frontend-app:local"
-FRONTEND_DIR="./frontend"
-
-docker build \
-  -f "${FRONTEND_DIR}/Dockerfile" \
-  --build-arg BACKEND_API_URL="$BACKEND_URL" \
-  --build-arg COGNITO_USER_POOL_ID="$USER_POOL_ID" \
-  --build-arg COGNITO_CLIENT_ID="$USER_POOL_CLIENT_ID" \
-  --build-arg COGNITO_REGION="$REGION" \
-  -t "$FRONTEND_IMAGE" \
-  "$FRONTEND_DIR"
-
-kubectl apply -f k8s/frontend.yaml
-kubectl -n "$NAMESPACE" rollout status deployment/frontend --timeout=120s
-
-echo "==> 13. Port-forward frontend to a fixed local port (persists after this script exits)"
-FRONTEND_LOCAL_PORT=30090
-pkill -f "port-forward.*svc/frontend.*${FRONTEND_LOCAL_PORT}:80" 2>/dev/null || true
-nohup kubectl -n "$NAMESPACE" port-forward --address 127.0.0.1 svc/frontend "${FRONTEND_LOCAL_PORT}:80" \
-  >/tmp/frontend-pf.log 2>&1 &
-FRONTEND_PF_PID=$!
-disown "$FRONTEND_PF_PID"
-sleep 2
-
-echo "$FASTAPI_PF_PID" > "$PERSIST_PIDS_FILE"
-echo "$FRONTEND_PF_PID" >> "$PERSIST_PIDS_FILE"
-
-echo "==> Done."
-echo "    Frontend URL: http://127.0.0.1:${FRONTEND_LOCAL_PORT}"
-echo "    Backend URL:  ${BACKEND_URL}"
-echo "    Admin login: $ADMIN_EMAIL / $ADMIN_PASSWORD"
-echo "    (Port-forwards run in the background — no terminal needs to stay open.)"
-echo "    To stop them later: ./stop.sh (or kill \$(cat $PERSIST_PIDS_FILE))"
-echo "    LocalStack: kubectl -n $NAMESPACE port-forward svc/localstack 4566:4566 (if you need host access again)"
+echo "🌐 Opening FastAPI..."
+kubectl port-forward service/fastapi 8000:8000
+kubectl get pods

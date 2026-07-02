@@ -4,9 +4,9 @@ set -e
 # Configuration
 BUCKET_NAME="my-test-bucket"
 QUEUE_NAME="image-processing-queue"
-CELERY_QUEUE_NAME="celery-task-queue"
+CELERY_QUEUE_NAME="simple-celery-queue"
 EMAIL_IDENTITY="test@example.com"
-REGION="us-east-1"
+REGION="us-west-1"
 ACCOUNT_ID="000000000000"
 DYNAMO_TABLE="images"
 
@@ -98,3 +98,5 @@ echo "  S3 bucket   : $BUCKET_NAME"
 echo "  SQS (S3)    : $QUEUE_URL"
 echo "  SQS (Celery): $CELERY_QUEUE_NAME"
 echo "  DynamoDB    : $DYNAMO_TABLE"
+touch /var/lib/localstack/init-complete
+echo "Init complete"

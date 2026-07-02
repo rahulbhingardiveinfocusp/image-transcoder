@@ -5,9 +5,7 @@ from pydantic_settings import BaseSettings
 from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     PROJECT_NAME: str = "ImageTranscoder"
-    DATABASE_URL: Optional[str] = None
-
-    AWS_REGION: str = "us-east-1"
+    AWS_REGION: str = "us-west-1"
     AWS_ACCESS_KEY_ID: str = ""
     AWS_SECRET_ACCESS_KEY: str = ""
 

@@ -50,8 +50,11 @@ def verify_cognito_token(
     token = credentials.credentials
 
     try:
+        logger.info(f"REGION:{REGION}")
+        logger.info(f"USER_POOL_ID:{USER_POOL_ID}")
+        logger.info(f"USER_POOL_CLIENT_ID:{CLIENT_ID}")
         key = get_public_key(token)
-
+        logger.info(f"key:{key}")
         if not key:
             raise HTTPException(status_code=401, detail="Invalid token key")
 
@@ -59,8 +62,8 @@ def verify_cognito_token(
             token,
             key,
             algorithms=["RS256"],
-            audience=CLIENT_ID,
             issuer=ISSUER,
+            options={"verify_aud": False},
         )
         logger.info(f"DECODED PAYLOAD:{payload}")
         return payload
@@ -74,10 +77,18 @@ def verify_cognito_token(
 
 
 def require_admin(payload: dict = Depends(verify_cognito_token)):
-    groups = payload.get("cognito:groups", [])
+    groups = (
+        payload.get("cognito:groups")
+        or payload.get("groups")
+        or []
+    )
+
+    if isinstance(groups, str):
+        groups = [groups]
 
     if "Admin" not in groups:
         raise HTTPException(status_code=403, detail="Admin privileges required")
+
     return payload
 
 def get_cognito_user_count():

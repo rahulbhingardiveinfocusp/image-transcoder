@@ -2,21 +2,24 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: celery
-  namespace: app-local
 spec:
   replicas: 1
   selector:
-    matchLabels: { app: celery }
+    matchLabels:
+      app: celery
   template:
     metadata:
-      labels: { app: celery }
+      labels:
+        app: celery
     spec:
       containers:
         - name: celery
-          image: fastapi-app:local
-          imagePullPolicy: Never
+          image: it-fastapi:local
+          command: ["sh", "-c"]
+          args:
+            - PYTHONPATH=/app celery -A app.tasks.image_tasks worker --loglevel=info -P gevent
           envFrom:
-            - configMapRef: { name: app-config }
-          env:
-            - name: CONTAINER_ROLE
-              value: "worker"
+            - configMapRef:
+                name: app-config
+            - secretRef:
+                name: app-secrets
