@@ -27,16 +27,13 @@ spec:
             - name: LOCALSTACK_AUTH_TOKEN
               value: "ls-VEsOwoXA-CiCu-5549-CIWa-SAkIfiSI6952"
           volumeMounts:
-            - name: data
-              mountPath: /var/lib/localstack
             - name: init-script
               mountPath: /etc/localstack/init/ready.d/init-aws.sh
               subPath: init-aws.sh
               readOnly: true
+
       volumes:
-        - name: data
-          emptyDir: {}
         - name: init-script
-          hostPath:
-            path: /home/rahul.bhingardive/Practice Projects/image-transcoder/init-aws.sh
-            type: File
+          configMap:
+            name: localstack-init
+            defaultMode: 0755
