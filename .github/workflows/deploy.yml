@@ -27,7 +27,11 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install Dependencies & Run Tests
+      - name: Install Dependencies
+        working-directory: ./backend
+        run: |
+          pip install -r requirements.txt
+      - name: Run Tests
         working-directory: ./backend
         env:
           PYTHONPATH: .
@@ -40,7 +44,6 @@ jobs:
           LOCALSTACK_ENDPOINT: ""
           CELERY_QUEUE_NAME: test-celery
         run: |
-          pip install -r requirements.txt
           pytest
 
       - name: Build & Push Backend to DockerHub
