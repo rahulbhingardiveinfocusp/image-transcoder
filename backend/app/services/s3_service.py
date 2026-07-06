@@ -8,7 +8,7 @@ from botocore.config import Config
 is_local = settings.LOCALSTACK_ENDPOINT is not None
 
 # 1. INTERNAL: for boto3 calls
-internal_endpoint = settings.LOCALSTACK_ENDPOINT
+internal_endpoint = settings.LOCALSTACK_ENDPOINT  or None
 
 # 2. PUBLIC: what browser can access
 public_endpoint = "http://localhost:4566" if is_local else None
