@@ -21,7 +21,6 @@ cat <<EOF > /tmp/s3-cors.json
         {
             "AllowedHeaders": ["*"],
             "AllowedMethods": ["PUT", "POST", "GET"],
-            "AllowedHeaders": ["*"],
             "AllowedOrigins": ["*"],
             "ExposeHeaders": ["ETag"]
         }
@@ -92,6 +91,7 @@ awslocal dynamodb create-table \
         "Projection": {"ProjectionType": "ALL"}
       }
     ]'
+awslocal ses verify-email-identity --email-address madnands5@gmail.com
 
 echo "LocalStack resources initialized successfully."
 echo "  S3 bucket   : $BUCKET_NAME"
@@ -99,4 +99,4 @@ echo "  SQS (S3)    : $QUEUE_URL"
 echo "  SQS (Celery): $CELERY_QUEUE_NAME"
 echo "  DynamoDB    : $DYNAMO_TABLE"
 touch /var/lib/localstack/init-complete
-echo "Init complete"
+echo "LocalStack init complete."

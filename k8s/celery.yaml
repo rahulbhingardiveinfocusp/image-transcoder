@@ -15,6 +15,7 @@ spec:
       containers:
         - name: celery
           image: it-fastapi:local
+          imagePullPolicy: Never
           command: ["sh", "-c"]
           args:
             - PYTHONPATH=/app celery -A app.tasks.image_tasks worker --loglevel=info -P gevent

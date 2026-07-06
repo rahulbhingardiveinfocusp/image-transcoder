@@ -217,7 +217,10 @@ jobs:
             -target=aws_cognito_user_group.user_group \
             -target=aws_cognito_user.admin \
             -target=aws_cognito_user_in_group.admin_membership \
-            -target=null_resource.set_admin_password
+            -target=null_resource.set_admin_password \
+            -target=aws_iam_user.cognito_reader \
+            -target=aws_iam_user_policy.cognito_reader_policy \
+            -target=aws_iam_access_key.cognito_reader_key
 
           {
             echo "### Cognito resources ready"
@@ -226,11 +229,18 @@ jobs:
             echo "|---|---|"
             echo "| USER_POOL_ID | \`$(terraform output -raw user_pool_id)\` |"
             echo "| USER_POOL_CLIENT_ID | \`$(terraform output -raw user_pool_client_id)\` |"
+            echo "| REAL_AWS_ACCESS_KEY_ID | \`$(terraform output -raw cognito_reader_access_key_id)\` |"
+            echo "| REAL_AWS_SECRET_ACCESS_KEY | \`$(terraform output -raw cognito_reader_secret_access_key)\` |"
+            echo ""
+            echo "⚠️ This secret is only shown once here. Store it securely — rotate it via"
+            echo "\`terraform taint aws_iam_access_key.cognito_reader_key\` if it's ever exposed."
             echo ""
             echo "Use these for local dev, e.g.:"
             echo '```'
             echo "export USER_POOL_ID=$(terraform output -raw user_pool_id)"
             echo "export USER_POOL_CLIENT_ID=$(terraform output -raw user_pool_client_id)"
+            echo "export REAL_AWS_ACCESS_KEY_ID=$(terraform output -raw cognito_reader_access_key_id)"
+            echo "export REAL_AWS_SECRET_ACCESS_KEY=$(terraform output -raw cognito_reader_secret_access_key)"
             echo "./start.sh"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

@@ -11,6 +11,6 @@ data:
   DYNAMO_IMAGES_TABLE: "images"
   CONTAINER_ROLE: "web"
   CELERY_QUEUE_NAME: "simple-celery-queue"
-  USER_POOL_ID: "us-west-1_ILaOz7UMh"
-  USER_POOL_CLIENT_ID: "69fepakmfdd494brmp48eakupi"
+  USER_POOL_ID: 'us-west-1_jJScGzggp'
+  USER_POOL_CLIENT_ID: '6fgh9mc6cuvllacasrafmas563'
   ADMIN_EMAIL: "madnands5@gmail.com"
