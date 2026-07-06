@@ -8,14 +8,10 @@ import sys
 import boto3
 from app.core.config import settings
 
-def _build_cognito_client():
-    kwargs = {"region_name": settings.AWS_REGION}
-    if settings.REAL_AWS_ACCESS_KEY_ID and settings.REAL_AWS_SECRET_ACCESS_KEY:
-        kwargs["aws_access_key_id"] = settings.REAL_AWS_ACCESS_KEY_ID
-        kwargs["aws_secret_access_key"] = settings.REAL_AWS_SECRET_ACCESS_KEY
-    return boto3.client("cognito-idp", **kwargs)
-
-cognito = _build_cognito_client()
+cognito = boto3.client(
+    "cognito-idp",
+    region_name=settings.AWS_REGION
+)
 
 logging.basicConfig(
     stream=sys.stdout,
