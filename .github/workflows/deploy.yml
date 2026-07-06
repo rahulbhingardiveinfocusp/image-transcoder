@@ -120,7 +120,7 @@ jobs:
           npm ci
           COGNITO_POOL_ID=$(cd ../terraform && terraform output -raw user_pool_id)
           COGNITO_CLIENT_ID=$(cd ../terraform && terraform output -raw user_pool_client_id)
-          BACKEND_IP="${{ steps.terraform_step.outputs.fetched_ip }}"
+          FRONTEND_CDN_URL=$(cd ../terraform && terraform output -raw frontend_url)
 
           sed -i "s#BACKEND_API_URL_PLACEHOLDER#http://${BACKEND_IP}:8000#g"  src/environments/environment.prod.ts
           sed -i "s#COGNITO_USER_POOL_ID_PLACEHOLDER#${COGNITO_POOL_ID}#g"    src/environments/environment.prod.ts
