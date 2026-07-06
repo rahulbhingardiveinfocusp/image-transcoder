@@ -546,7 +546,36 @@ aws cognito-idp admin-set-user-password \
 EOT
   }
 }
+# =========================================================================
+# 7. LOCAL-DEV IAM USER — SCOPED TO COGNITO READ-ONLY
+# =========================================================================
+resource "aws_iam_user" "cognito_reader" {
+  name = "cognito-readonly-local-dev"
+  tags = {
+    Purpose = "local-dev-cognito-readonly"
+  }
+}
 
+resource "aws_iam_user_policy" "cognito_reader_policy" {
+  name = "CognitoListUsersOnly"
+  user = aws_iam_user.cognito_reader.name
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect   = "Allow"
+      Action   = ["cognito-idp:ListUsers", "cognito-idp:DescribeUserPool"]
+      Resource = aws_cognito_user_pool.main.arn
+    }]
+  })
+}
+
+# Terraform state is the source of truth here — as long as this resource
+# stays in state, `terraform apply` will NOT create a new key or rotate
+# the existing one. It's only created once, the first time this resource
+# is added and applied.
+resource "aws_iam_access_key" "cognito_reader_key" {
+  user = aws_iam_user.cognito_reader.name
+}
 # =========================================================================
 # OUTPUTS
 # =========================================================================
@@ -559,3 +588,10 @@ output "server_instance_id"   { value = aws_instance.app_server.id }
 output "user_pool_id"         { value = aws_cognito_user_pool.main.id }
 output "user_pool_client_id"  { value = aws_cognito_user_pool_client.client.id }
 output "dynamo_table_name"    { value = aws_dynamodb_table.images.name }  # FIX: new output
+output "cognito_reader_access_key_id" {
+  value = aws_iam_access_key.cognito_reader_key.id
+}
+output "cognito_reader_secret_access_key" {
+  value     = aws_iam_access_key.cognito_reader_key.secret
+  sensitive = true
+}
