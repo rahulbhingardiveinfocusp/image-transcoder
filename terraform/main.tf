@@ -232,6 +232,11 @@ resource "aws_iam_role_policy" "ec2_policy" {
           aws_dynamodb_table.images.arn,
           "${aws_dynamodb_table.images.arn}/index/*",  # required for GSI queries
         ]
+      },
+      {
+        Effect   = "Allow"
+        Action   = ["cognito-idp:ListUsers", "cognito-idp:DescribeUserPool"]
+        Resource = aws_cognito_user_pool.main.arn
       }
     ]
   })

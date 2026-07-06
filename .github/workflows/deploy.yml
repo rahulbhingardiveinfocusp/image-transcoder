@@ -95,7 +95,31 @@ jobs:
           else
             terraform destroy -auto-approve
           fi
+      - name: Debug - Verify Cognito permissions on EC2 role
+        working-directory: ./terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+        run: |
+          ROLE_NAME=$(terraform state show aws_iam_role.ec2_role | grep -m1 '^\s*name ' | awk -F'"' '{print $2}')
+          echo "Role: $ROLE_NAME"
 
+          echo "--- Inline policies on role ---"
+          aws iam list-role-policies --role-name "$ROLE_NAME"
+
+          for POLICY_NAME in $(aws iam list-role-policies --role-name "$ROLE_NAME" --query 'PolicyNames[]' --output text); do
+            echo "--- Policy: $POLICY_NAME ---"
+            aws iam get-role-policy --role-name "$ROLE_NAME" --policy-name "$POLICY_NAME"
+          done
+
+          echo "--- Simulate ListUsers call ---"
+          ROLE_ARN=$(terraform state show aws_iam_role.ec2_role | grep -m1 '^\s*arn ' | awk -F'"' '{print $2}')
+          POOL_ARN=$(terraform state show aws_cognito_user_pool.main | grep -m1 '^\s*arn ' | awk -F'"' '{print $2}')
+          aws iam simulate-principal-policy \
+            --policy-source-arn "$ROLE_ARN" \
+            --action-names cognito-idp:ListUsers \
+            --resource-arns "$POOL_ARN"
       - name: Setup Node.js Environment
         if: github.event.inputs.action == 'deploy' && steps.terraform_step.outputs.fetched_ip != ''
         uses: actions/setup-node@v4
