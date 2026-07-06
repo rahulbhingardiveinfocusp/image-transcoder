@@ -593,5 +593,5 @@ output "cognito_reader_access_key_id" {
 }
 output "cognito_reader_secret_access_key" {
   value     = aws_iam_access_key.cognito_reader_key.secret
-  sensitive = false
+  sensitive = true
 }
