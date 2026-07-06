@@ -21,7 +21,8 @@ class Settings(BaseSettings):
     ADMIN_EMAIL: str
     USER_POOL_CLIENT_ID: Optional[str] = None
     USER_POOL_ID: Optional[str] = None
-
+    REAL_AWS_ACCESS_KEY_ID: Optional[str] = None
+    REAL_AWS_SECRET_ACCESS_KEY: Optional[str] = None
 model_config = SettingsConfigDict(env_file=".env")
 
 

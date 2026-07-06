@@ -14,7 +14,7 @@ kubectl delete -f k8s/localstack-init-configmap.yaml --ignore-not-found
 kubectl delete pvc --all --ignore-not-found
 
 echo "📦 Building fresh FastAPI/Celery image inside Minikube..."
-minikube image build --build-opt=no-cache -t it-fastapi:local ./backend
+minikube image build -t it-fastapi:local ./backend
 
 echo "📦 Applying Kubernetes manifests..."
 kubectl apply -f k8s/secrets.yaml

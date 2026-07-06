@@ -4,7 +4,7 @@ import datetime
 import logging
 import uuid
 from typing import Any, Callable
-from xml.dom.minidom import Attr
+from boto3.dynamodb.conditions import Attr
 
 from app.services.cognito import get_cognito_user_count
 import boto3
