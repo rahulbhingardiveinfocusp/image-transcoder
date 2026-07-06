@@ -1,3 +1,4 @@
+from urllib.parse import urlsplit, urlunsplit
 from venv import logger
 
 import boto3
@@ -31,13 +32,15 @@ class S3Service:
 
         self.public_endpoint = public_endpoint
 
+    from urllib.parse import urlsplit, urlunsplit
+
     def make_public_url(self, url: str) -> str:
-        if not self.public_endpoint:
+        if not self.public_endpoint or not settings.LOCALSTACK_ENDPOINT:
             return url
-
-        # replace internal host with browser-safe host
-        return url.replace(settings.LOCALSTACK_ENDPOINT, self.public_endpoint)
-
+        parts = urlsplit(url)
+        public_parts = urlsplit(self.public_endpoint)
+        return urlunsplit(parts._replace(scheme=public_parts.scheme, netloc=public_parts.netloc))
+    
     def generate_presigned_url(
         self,
         object_name: str,
